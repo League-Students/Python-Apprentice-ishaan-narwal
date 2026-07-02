@@ -16,7 +16,8 @@ import turtle                           # Tell Python we want to work with the t
 turtle.setup(600, 600, 0, 0)            # Set the size of the window
 tina = turtle.Turtle() 
 tina.circle(60)
-tina.begin_fill("blue")
+fillcolor("blue")
+tina.begin_fill
 tina.end_fill
 tina.penup
 tina.goto(601, 601, 0, 0)
