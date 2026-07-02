@@ -15,16 +15,16 @@ Refer to the previous program, Meet_Tina.py for examples of how to use these tur
 import turtle                           # Tell Python we want to work with the turtle
 turtle.setup(600, 600, 0, 0)            # Set the size of the window
 tina = turtle.Turtle() 
-tina.circle(60)
 tina.fillcolor("blue")
 tina.begin_fill()
+tina.circle(60)
 tina.end_fill()
 tina.penup()
 tina.goto(120, 0)
 tina.pendown()
-tina.circle(60)
 tina.fillcolor("cyan")
 tina.begin_fill()
+tina.circle(60)
 tina.end_fill()                 # Create a turtle named tina
 
 # Use tina.circle() to draw a circle, and tina.goto() to move tina to a new location
