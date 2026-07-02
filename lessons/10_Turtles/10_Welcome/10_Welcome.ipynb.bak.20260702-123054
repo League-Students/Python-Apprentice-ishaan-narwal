@@ -1,0 +1,79 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# **Getting Started with Python**\n",
+    "\n",
+    "Welcome to your first **Python** lesson with the *League of Amazing Programmers*. This course will help you take your first steps into programming.\n",
+    "\n",
+    "To follow along, make sure you're reading this lesson in one of these spots:\n",
+    "\n",
+    "* [**Visual Studio Code**](https://code.visualstudio.com/) (if you're on your own computer)\n",
+    "* [**GitHub Codespaces**](https://github.com/features/codespaces) (if you're working in a web browser)\n",
+    "* **The League Code Server** (if you're using the League's online coding platform) <!--If there is a link for this let me know -->\n",
+    "\n",
+    "We'll start by learning **turtle programming**, which lets you give commands to a virtual turtle, telling it where to move on the screen. It's like having a small robot artist you can control with code. To do this, we'll use a pre-installed Python tool called the **turtle module**.\n",
+    "\n",
+    "You can tell your turtle to move forward, turn left or right, and change the color of the lines it draws. With these commands, you can create pictures like the one below.\n",
+    "\n",
+    "<div style=\"display: flex; align-items: center; gap: 25px; margin-top: 20px;\">\n",
+    "\n",
+    "<div style=\"flex: 1;\">\n",
+    "        <img src=\"https://curriculum.jointheleague.org/Python-Apprentice/images/turtle-spirals.gif\" alt=\"A colorful spiral drawn with the turtle library.\" style=\"border-radius: 8px;\">\n",
+    "</div>\n",
+    "\n",
+    "<div style=\"flex: 2; align-self: flex-start;\">\n",
+    "        <h2><strong>Getting Set Up</strong></h2>\n",
+    "        <p>Before you can start drawing, you'll need to set up your coding environment. If anything seems confusing, ask your instructor for help.</p>\n",
+    "        <p>When you're ready, click the blue <span style=\"background-color: #0099ffff; color: white; padding: 2px 8px; border-radius: 4px;\">Next Lesson</span> button at the bottom-left of your screen to continue.</p>\n",
+    "\n",
+    "<div class=\"alert alert-block alert-info\">\n",
+    "        <h4><strong>Course Symbols</strong></h4>\n",
+    "        This course uses a few symbols to flag different kinds of information. Take a moment to look them over before you continue.\n",
+    "            <ul>\n",
+    "                <li><strong>Tooltip</strong> — Small pop-up boxes that appear when you hover over specific text or icons. They provide quick definitions and explanations for key terms.</li>\n",
+    "                <li><strong>Important</strong> — Highlights key concepts, rules, or warnings. These often contain information you'll need for later lessons.</li>\n",
+    "                <li><strong>Bookmarks</strong> — Provide extra details, background, or interesting facts about a topic. They're optional, but reading them can give you a fuller picture of how things work.</li>\n",
+    "            </ul>\n",
+    "<center>It's worth reading through each of these, since the lessons refer back to them.</center>\n",
+    "</div>\n",
+    "</div>\n",
+    "</div>"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    ">**Note:** Take your time with each lesson. To get the most out of this course, study the code examples, experiment with them, and ask questions when you're stuck. Rushing through without practicing tends to make things harder to follow later on."
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python-Apprentice (3.13.3)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.13.3"
+  },
+  "syllabus": {
+   "name": "Welcome",
+   "uid": "RRTPqCQu"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 4
+}

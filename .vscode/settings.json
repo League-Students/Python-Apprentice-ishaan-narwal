@@ -1,5 +1,5 @@
 {
-  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+  "python.defaultInterpreterPath": "/usr/local/bin/python3",
   "python.terminal.activateEnvironment": true,
   "terminal.integrated.env.linux": {
     "VIRTUAL_ENV": "${workspaceFolder}/.venv",
@@ -43,5 +43,9 @@
     "**/.tox": true,
     "**/*.crswap": true,
     "**/.cache": true
-  }
+  },
+  "jupyter.kernels.excludePythonEnvironments": [
+    "/bin/python3",
+    "/usr/bin/python3"
+  ]
 }
