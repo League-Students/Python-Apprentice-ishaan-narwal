@@ -15,7 +15,11 @@ turtle.setup(600, 600, 0, 0)            # Set the size of the window
 tina = turtle.Turtle()                  # Create a turtle named tina
 tina.forward(50)
 tina.left(130)
-tina.pencolor(green)
+tina.pencolor("green")
+tina.forward(50)
+tina.left(130)
+tina.pencolor("cyan")
+
 
 
 
