@@ -13,7 +13,9 @@ Refer to previous turtle programs for examples of how to use these commands.
 import turtle                           # Tell Python we want to work with the turtle
 turtle.setup(600, 600, 0, 0)            # Set the size of the window
 tina = turtle.Turtle()                  # Create a turtle named tina
-
+tina.forward(50)
+tina.left(130)
+tina.pencolor(green)
 
 
 
