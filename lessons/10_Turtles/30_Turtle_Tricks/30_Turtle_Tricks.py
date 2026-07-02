@@ -19,9 +19,9 @@ tina.circle(60)
 tina.fillcolor("blue")
 tina.begin_fill()
 tina.end_fill()
-tina.penup
+tina.penup()
 tina.goto(120, 0)
-tina.pendown
+tina.pendown()
 tina.circle(60)
 tina.fillcolor("cyan")
 tina.begin_fill()
