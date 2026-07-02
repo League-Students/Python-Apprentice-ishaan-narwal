@@ -24,7 +24,8 @@ tina.left(60)
 tina.pencolor("black")
 tina.forward(50)                  # Create a turtle named tina
 tina.pencolor("yellow")
-
+tina.left(60)
+tina.forward(50) 
 tina.left(60)
 tina.pencolor("purple")
 tina.forward(50) 
