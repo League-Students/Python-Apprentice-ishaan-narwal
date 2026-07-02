@@ -19,7 +19,8 @@ tina.pencolor("green")
 tina.forward(50)
 tina.left(130)
 tina.pencolor("cyan")
-
+tina.forward(50)
+tina.penup
 
 
 
