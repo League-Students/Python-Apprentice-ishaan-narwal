@@ -18,7 +18,7 @@ import turtle                                           # Import the turtle modu
 
 screen = turtle.Screen()                                    # Set up the screen
 screen.setup(width=600, height=600)                         # Set the size of the window
-screen.bgcolor('white')                                     # Set the background color
+screen.bgcolor('white')                                     # Se    t the background color
 
 t = turtle.Turtle()                                         # Create a turtle
 t.shape("turtle")                                           # Set the shape of the turtle
