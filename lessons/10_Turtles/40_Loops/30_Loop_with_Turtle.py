@@ -16,6 +16,6 @@ name: Loop With Turtle
 ... # Your code here
 turtle.setup(600, 600, 0, 0)            # Set the size of the window
 tina = turtle.Turtle()                  # Create a turtle named tina
-
-tina.forward(40)
-tina.left(120)
+for i in range(5):
+    tina.forward(40)
+    tina.left(120)
