@@ -14,14 +14,14 @@ import turtle                           # Tell Python we want to work with the t
 turtle.setup(600, 600, 0, 0)            # Set the size of the window
 tina = turtle.Turtle()                  # Create a turtle named tina
 tina.forward(40)
-tina.left()
+tina.left(120)
 tina.pencolor("green")
-tina.forward(50)
-tina.left(60)
+tina.forward(60)
+tina.left(120)
 tina.pencolor("cyan")
-tina.forward(50)
-tina.penup
-tina.left(60)
+tina.forward(60)
+tina.left(120)
+tina.pencolor()
 
 
 
