@@ -21,7 +21,8 @@ tina.left(120)
 tina.pencolor("cyan")
 tina.forward(60)
 tina.left(120)
-tina.pencolor()
+tina.pencolor("black")
+tina.forward(30)
 
 
 
