@@ -18,7 +18,7 @@ tina = turtle.Turtle()
 tina.circle(60)
 begin_fill("blue")
 tina.penup
-
+tina.goto(601, 601, 0, 0)
 tina.circle(60)
 tina.begin_fill("blue")                 # Create a turtle named tina
 
