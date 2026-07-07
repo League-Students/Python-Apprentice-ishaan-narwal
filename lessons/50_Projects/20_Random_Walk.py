@@ -1,51 +1,37 @@
-"""
-A simple turtle program that moves the turtle randomly in the grid 
-
-This program will perform a "random walk" by moving the turtle randomly in the grid.
-
-Implement the random_walk function that will move the turtle randomly in the grid.
-
-uid: eefj8Ioy
-name: Random Walk
-"""
-
-import turtle
 import random
+import time
+import sys
 
-# Set up the screen
-screen = turtle.Screen()
-screen.setup(width=600, height=600)
-screen.bgcolor("white")
+# Dramatic typing effect
+def type_pulse(text):
+    for char in text:
+        sys.stdout.write(char)
+        sys.stdout.flush()
+        time.sleep(0.04)
+    print()
 
-# Set up the turtle
-walker = turtle.Turtle()
-walker.shape("turtle")
-walker.penup()
-walker.speed(0)  # Set to the maximum speed
-walker.goto(0, 0)  # Start in the middle of the grid
-walker.pendown()
+# Massive lists of chaotic possibilities
+intents = [
+    "A chaotic goblin energy", "A highly specific sandwich", 
+    "An unexplainable glitch in the matrix", "A wealthy talking raccoon"
+]
+actions = [
+    "will aggressively manifest in your kitchen.", "will hand you a mysterious receipt.",
+    "will challenge you to a dance-off.", "will legally change your middle name."
+]
+timelines = [
+    "exactly 42 minutes from now.", "the next time you forget your password.",
+    "on a random Tuesday.", "right... NOW!"
+]
 
-# Function to move the turtle randomly in the grid
-def random_walk(walker, steps):
-    """ Implement a random walk for the turtle
+# The "Prediction Engine"
+type_pulse("🔮 Booting Cosmic Chaos Engine...")
+time.sleep(1)
+type_pulse("🎲 Shuffling the fabric of space-time...")
+time.sleep(1)
+print("-" * 50)
 
-    The turtle will move on a grid, taking a random step in one of the four directions
-
-    For each of the steps, the turtle will move in a random direction (N, E, S, W) 
-    a fixed number of steps. For instance, the turtle should move 10 pixels each time, but
-    in a random direction.
-
-    Args:
-    walker (turtle.Turtle): The turtle object
-    steps (int): The number of steps to take
-
-    """
-
-
-
-
-# Start the random walk
-random_walk(walker, 200)
-
-# Close the turtle window on click
-screen.exitonclick()
+# Generate the randomness
+prediction = f"✨ PREDICTION: {random.choice(intents)} {random.choice(actions)} {random.choice(timelines)}"
+type_pulse(prediction)
+print("-" * 50)
