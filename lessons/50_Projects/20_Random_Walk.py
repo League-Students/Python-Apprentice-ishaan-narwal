@@ -41,28 +41,6 @@ def random_walk(walker, steps):
 
     """
 
-    # You can make the turtle move randomly in either of two ways: randomly choosing a direction
-    # or randomly choosing an angle to turn. You can use random.choice() to select a random element
-    # from a list, like this: 
-    # direction = random.choice(["N", "E", "S", "W"])
-    # or
-    # angle = random.choice([0, 90, 180, 270])
-    #
-    # Or you can use random.randint() to generate a random integer between two values, like this:
-    # angle_index = random.randint(0, 3)
-    # directions = ["N", "E", "S", "W"] # or directions = [0, 90, 180, 270]
-    # direction = directions[angle_index]
-    #
-    # To set the turtle's heading, you can use the setheading() method, like this:
-    # walker.setheading(angle)  # North
-    #
-    # you can use the right() or left() methods to turn the turtle, like this:
-    # walker.right(angle)  # Turn right by `angle` degrees
-    #
-    #
-    # Read one of the past turtle programs to see how to use these methods.
-
-    # Your code here
 
 
 
