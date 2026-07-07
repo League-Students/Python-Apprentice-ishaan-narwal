@@ -170,15 +170,15 @@ def generate_procedural_level(level_num):
     # --- RANDOM GENERATION LOGIC FOR LEVELS 2 - 500 ---
     random.seed(level_num + 999)
     
-    # Starting Floor platform
-    level_data["platforms"].append((0, 530, 200, 70))
+    # Starting Floor platform for procedurally generated maps
+    level_data["platforms"].append((20, 500, 200, 100))
     
     # Calculate difficulty scaling ratios (0.0 to 1.0) based on reaching level 500
     progression = min(level_num / 500.0, 1.0)
     
     # Tweak platform sizes depending on how deep the level index is
-    min_width = int(120 - (progression * 50))  # Shrinks from 120 down to 70
-    max_width = int(180 - (progression * 60))  # Shrinks from 180 down to 120
+    min_width = int(120 - (progression * 50))  
+    max_width = int(180 - (progression * 60))  
     
     current_x = 150
     current_y = 450
@@ -190,17 +190,14 @@ def generate_procedural_level(level_num):
         
         # Decide next jump direction or add vertical wall-jump pillars
         if random.random() < 0.25 * progression:
-            # Drop a vertical column block to force a wall jump sequence
             level_data["platforms"].append((current_x + 30, current_y - 80, 40, 100))
             current_y -= 120
         else:
             level_data["platforms"].append((current_x, current_y, p_width, p_height))
             
-            # Advance horizontally and vertically
             gap_x = random.randint(80, int(130 + (progression * 50)))
             gap_y = random.randint(70, 100)
             
-            # Switch directions if bouncing off screen constraints
             if current_x + p_width + gap_x > 740:
                 current_x = random.randint(40, 150)
             else:
@@ -229,10 +226,11 @@ def main():
     stars = pygame.sprite.Group()
     goals = pygame.sprite.Group()
 
-    player = Player(80, 450)
+    # Fixed starting position to spawn exactly on top of the new y=500 platform
+    player = Player(60, 450)
     all_sprites.add(player)
 
-    current_idx = 1  # Starts at Level 1
+    current_idx = 1  
     MAX_LEVELS = 500
 
     def load_level(idx):
@@ -253,8 +251,8 @@ def main():
         goals.add(goal)
         all_sprites.add(goal)
 
-        # Reposition ninja safely at spawn coordinates
-        player.rect.topleft = (80, 420)
+        # Reposition ninja safely at spawn coordinates on top of the platform
+        player.rect.topleft = (60, 450)
         player.vx, player.vy = 0, 0
 
     load_level(current_idx)
@@ -281,7 +279,7 @@ def main():
 
             # Respawn if falling out of screen space
             if player.rect.top > SCREEN_HEIGHT:
-                player.rect.topleft = (80, 420)
+                player.rect.topleft = (60, 450)
                 player.vx, player.vy = 0, 0
 
         screen.fill(COLOR_BG)
@@ -289,4 +287,6 @@ def main():
 
         if win_state:
             txt = font.render("YOU CONQUERED ALL 500 LEVELS!", True, COLOR_STAR)
+            screen.blit(txt, (SCREEN_WIDTH // 2 - 180, SCREEN_HEIGHT // 2))
+        else:
 main()
