@@ -57,11 +57,6 @@ class Player(pygame.sprite.Sprite):
         self.facing_direction = 1  
         self.on_wall = 0          
         self.shoot_cooldown = 0
-        
-        # Double Jump properties
-        self.max_jumps = 2
-        self.jumps_remaining = 2
-        self.jump_key_pressed = False
 
     def handle_input(self, all_sprites, stars):
         keys = pygame.key.get_pressed()
@@ -73,29 +68,14 @@ class Player(pygame.sprite.Sprite):
             self.vx += RUN_SPEED
             self.facing_direction = 1
 
-        # Jump Input with single-press validation (prevents instantly consuming both jumps)
-        jump_key = keys[pygame.K_UP] or keys[pygame.K_w] or keys[pygame.K_SPACE]
-        if jump_key:
-            if not self.jump_key_pressed:
-                self.jump_key_pressed = True
-                
-                # Case 1: Ground Jump
-                if self.is_grounded:
-                    self.vy = JUMP_FORCE
-                    self.is_grounded = False
-                    self.jumps_remaining -= 1
-                # Case 2: Wall Jump (Takes precedence over double jump while on a wall)
-                elif self.on_wall != 0:  
-                    self.vy = JUMP_FORCE
-                    self.vx = -self.on_wall * (MAX_SPEED * 1.2)  
-                    self.on_wall = 0
-                    self.jumps_remaining = self.max_jumps - 1 # Grant a double jump fresh off a wall kick
-                # Case 3: Mid-air Double Jump
-                elif self.jumps_remaining > 0:
-                    self.vy = JUMP_FORCE
-                    self.jumps_remaining -= 1
-        else:
-            self.jump_key_pressed = False
+        if keys[pygame.K_UP] or keys[pygame.K_w] or keys[pygame.K_SPACE]:
+            if self.is_grounded:
+                self.vy = JUMP_FORCE
+                self.is_grounded = False
+            elif self.on_wall != 0:  
+                self.vy = JUMP_FORCE
+                self.vx = -self.on_wall * (MAX_SPEED * 1.2)  
+                self.on_wall = 0
 
         if (keys[pygame.K_f] or keys[pygame.K_RETURN]) and self.shoot_cooldown == 0:
             star = NinjaStar(self.rect.centerx, self.rect.centery, self.facing_direction)
@@ -115,7 +95,6 @@ class Player(pygame.sprite.Sprite):
         
         if self.on_wall != 0 and self.vy > WALL_SLIDE_SPEED:
             self.vy = WALL_SLIDE_SPEED
-            self.jumps_remaining = self.max_jumps # Reset jumps while sliding down walls
 
         self.rect.x += int(self.vx)
         self.on_wall = 0
@@ -146,7 +125,6 @@ class Player(pygame.sprite.Sprite):
                         self.rect.bottom = platform.rect.top
                         self.vy = 0
                         self.is_grounded = True
-                        self.jumps_remaining = self.max_jumps # Reset jumps when touching the floor
                     elif self.vy < 0:
                         self.rect.top = platform.rect.bottom
                         self.vy = 0
@@ -170,47 +148,49 @@ class Goal(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(topleft=(x, y))
 
 
-# --- PROCEDURAL GENERATOR ALGORITHM WITH TUTORIAL BYPASS ---
+# --- PROCEDURAL GENERATOR ALGORITHM ---
 def generate_procedural_level(level_num):
-    """ Builds a guaranteed easy Level 1, then procedural maps up to level 500 """
+    """ Dynamically builds mathematically beatable levels up to level 500 """
+    # Set seed so level layouts remain persistent based on the level number
+    random.seed(level_num + 999)
+    
     level_data = {"platforms": [], "goal": (0, 0)}
     
+    # Boundary Walls
     level_data["platforms"].append((0, 0, 20, 600))
     level_data["platforms"].append((780, 0, 20, 600))
     
-    if level_num == 1:
-        level_data["platforms"].extend([
-            (0, 530, 300, 70),    
-            (350, 440, 150, 20),   
-            (550, 350, 180, 20),   
-            (300, 250, 200, 20),   
-            (80, 180, 160, 20)     
-        ])
-        level_data["goal"] = (140, 120)
-        return level_data
-
-    random.seed(level_num + 999)
-    level_data["platforms"].append((0, 530, 200, 70)) 
+    # Starting Floor platform
+    level_data["platforms"].append((0, 530, 200, 70))
     
+    # Calculate difficulty scaling ratios (0.0 to 1.0) based on reaching level 500
     progression = min(level_num / 500.0, 1.0)
-    min_width = int(120 - (progression * 50))  
-    max_width = int(180 - (progression * 60))  
+    
+    # Tweak platform sizes depending on how deep the level index is
+    min_width = int(120 - (progression * 50))  # Shrinks from 120 down to 70
+    max_width = int(180 - (progression * 60))  # Shrinks from 180 down to 120
     
     current_x = 150
     current_y = 450
     
+    # Snake pattern generation ascending upwards to the goal height
     while current_y > 150:
         p_width = random.randint(min_width, max_width)
         p_height = 20
         
+        # Decide next jump direction or add vertical wall-jump pillars
         if random.random() < 0.25 * progression:
+            # Drop a vertical column block to force a wall jump sequence
             level_data["platforms"].append((current_x + 30, current_y - 80, 40, 100))
             current_y -= 120
         else:
             level_data["platforms"].append((current_x, current_y, p_width, p_height))
-            gap_x = random.randint(80, int(120 + (progression * 50))) 
-            gap_y = random.randint(70, 95)
             
+            # Advance horizontally and vertically
+            gap_x = random.randint(80, int(130 + (progression * 50)))
+            gap_y = random.randint(70, 100)
+            
+            # Switch directions if bouncing off screen constraints
             if current_x + p_width + gap_x > 740:
                 current_x = random.randint(40, 150)
             else:
@@ -218,6 +198,7 @@ def generate_procedural_level(level_num):
                 
             current_y -= gap_y
 
+    # Place the ultimate goal pad on the last platform sequence
     goal_platform_x = random.randint(100, 500)
     level_data["platforms"].append((goal_platform_x, 130, 150, 20))
     level_data["goal"] = (goal_platform_x + 55, 70)
@@ -238,10 +219,10 @@ def main():
     stars = pygame.sprite.Group()
     goals = pygame.sprite.Group()
 
-    player = Player(40, 450)
+    player = Player(80, 450)
     all_sprites.add(player)
 
-    current_idx = 1  
+    current_idx = 1  # Starts at Level 1
     MAX_LEVELS = 500
 
     def load_level(idx):
@@ -249,6 +230,7 @@ def main():
         for sprite in goals: sprite.kill()
         for sprite in stars: sprite.kill()
 
+        # Build dynamic environment algorithm layout
         generated_level = generate_procedural_level(idx)
         
         for p in generated_level["platforms"]:
@@ -261,6 +243,7 @@ def main():
         goals.add(goal)
         all_sprites.add(goal)
 
+        # Reposition ninja
         player.rect.topleft = (40, 450)
         player.vx, player.vy = 0, 0
 
@@ -278,6 +261,7 @@ def main():
             player.update(platforms)
             stars.update(platforms)
 
+            # Check portal touching conditions
             if pygame.sprite.spritecollideany(player, goals):
                 current_idx += 1
                 if current_idx <= MAX_LEVELS:
@@ -285,6 +269,7 @@ def main():
                 else:
                     win_state = True
 
+            # Respawn if falling out of screen space
             if player.rect.top > SCREEN_HEIGHT:
                 player.rect.topleft = (40, 450)
                 player.vx, player.vy = 0, 0
@@ -294,4 +279,16 @@ def main():
 
         if win_state:
             txt = font.render("YOU CONQUERED ALL 500 LEVELS!", True, COLOR_STAR)
-main()
+            screen.blit(txt, (SCREEN_WIDTH // 2 - 180, SCREEN_HEIGHT // 2))
+        else:
+            hud = font.render(f"Level: {current_idx} / {MAX_LEVELS}  | Controls: WASD/Arrows to Move | F to Shoot", True, COLOR_TEXT)
+            screen.blit(hud, (20, 20))
+
+        pygame.display.flip()
+        clock.tick(FPS)
+
+    pygame.quit()
+    sys.exit()
+
+if __name__ == "__main__":
+    main()
