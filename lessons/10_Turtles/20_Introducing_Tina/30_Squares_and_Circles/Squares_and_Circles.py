@@ -57,6 +57,11 @@ class Player(pygame.sprite.Sprite):
         self.facing_direction = 1  
         self.on_wall = 0          
         self.shoot_cooldown = 0
+        
+        # Double Jump properties
+        self.max_jumps = 2
+        self.jumps_remaining = 2
+        self.jump_key_pressed = False
 
     def handle_input(self, all_sprites, stars):
         keys = pygame.key.get_pressed()
@@ -68,14 +73,29 @@ class Player(pygame.sprite.Sprite):
             self.vx += RUN_SPEED
             self.facing_direction = 1
 
-        if keys[pygame.K_UP] or keys[pygame.K_w] or keys[pygame.K_SPACE]:
-            if self.is_grounded:
-                self.vy = JUMP_FORCE
-                self.is_grounded = False
-            elif self.on_wall != 0:  
-                self.vy = JUMP_FORCE
-                self.vx = -self.on_wall * (MAX_SPEED * 1.2)  
-                self.on_wall = 0
+        # Jump Engine (Ensures double jumps aren't accidentally triggered at once)
+        jump_key = keys[pygame.K_UP] or keys[pygame.K_w] or keys[pygame.K_SPACE]
+        if jump_key:
+            if not self.jump_key_pressed:
+                self.jump_key_pressed = True
+                
+                # Case 1: Grounded Jump
+                if self.is_grounded:
+                    self.vy = JUMP_FORCE
+                    self.is_grounded = False
+                    self.jumps_remaining -= 1
+                # Case 2: Wall Kick
+                elif self.on_wall != 0:  
+                    self.vy = JUMP_FORCE
+                    self.vx = -self.on_wall * (MAX_SPEED * 1.2)  
+                    self.on_wall = 0
+                    self.jumps_remaining = self.max_jumps - 1 
+                # Case 3: Mid-air Double Jump
+                elif self.jumps_remaining > 0:
+                    self.vy = JUMP_FORCE
+                    self.jumps_remaining -= 1
+        else:
+            self.jump_key_pressed = False
 
         if (keys[pygame.K_f] or keys[pygame.K_RETURN]) and self.shoot_cooldown == 0:
             star = NinjaStar(self.rect.centerx, self.rect.centery, self.facing_direction)
@@ -95,6 +115,7 @@ class Player(pygame.sprite.Sprite):
         
         if self.on_wall != 0 and self.vy > WALL_SLIDE_SPEED:
             self.vy = WALL_SLIDE_SPEED
+            self.jumps_remaining = self.max_jumps 
 
         self.rect.x += int(self.vx)
         self.on_wall = 0
@@ -125,6 +146,7 @@ class Player(pygame.sprite.Sprite):
                         self.rect.bottom = platform.rect.top
                         self.vy = 0
                         self.is_grounded = True
+                        self.jumps_remaining = self.max_jumps 
                     elif self.vy < 0:
                         self.rect.top = platform.rect.bottom
                         self.vy = 0
@@ -148,67 +170,77 @@ class Goal(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(topleft=(x, y))
 
 
-# --- PROCEDURAL GENERATOR ALGORITHM ---
-def generate_procedural_level(level_num):
-    """ Dynamically builds mathematically beatable levels up to level 500 """
+# --- FIXED MID-EASY HANDCRAFTED LAYOUTS (LEVELS 1 - 10) ---
+HANDCRAFTED_LEVELS = {
+    1: {"platforms": [(20, 500, 250, 100), (320, 420, 200, 30), (570, 320, 190, 30)], "goal": (640, 260)},
+    2: {"platforms": [(20, 500, 200, 100), (280, 430, 180, 30), (520, 340, 220, 30)], "goal": (600, 280)},
+    3: {"platforms": [(20, 500, 150, 100), (240, 420, 140, 30), (450, 330, 140, 30), (640, 240, 120, 30)], "goal": (680, 180)},
+    4: {"platforms": [(20, 500, 180, 100), (260, 400, 160, 30), (480, 420, 120, 30), (640, 300, 120, 30)], "goal": (680, 240)},
+    5: {"platforms": [(20, 500, 150, 100), (220, 410, 130, 30), (420, 320, 130, 30), (220, 230, 150, 30)], "goal": (260, 170)},
+    6: {"platforms": [(20, 500, 160, 100), (240, 430, 150, 30), (450, 430, 150, 30), (650, 340, 110, 30)], "goal": (680, 280)},
+    7: {"platforms": [(20, 500, 140, 100), (220, 420, 160, 30), (430, 330, 160, 30), (220, 240, 160, 30)], "goal": (260, 180)},
+    8: {"platforms": [(20, 500, 160, 100), (240, 400, 140, 30), (440, 300, 140, 30), (640, 200, 120, 30)], "goal": (680, 140)},
+    9: {"platforms": [(20, 500, 180, 100), (260, 440, 120, 30), (440, 360, 120, 30), (620, 280, 140, 30)], "goal": (670, 220)},
+    10: {"platforms": [(20, 500, 200, 100), (300, 410, 180, 30), (540, 320, 200, 30)], "goal": (620, 260)},
+}
+
+
+# --- THE 50-LEVEL ENGINE CONTROLLER ---
+def generate_game_level(level_num):
+    """ Loads handmade assets if level <= 10, otherwise executes clean generation """
     level_data = {"platforms": [], "goal": (0, 0)}
     
-    # Boundary Walls (Always load to keep the player inside screen bounds)
+    # Boundary Screen Enclosures
     level_data["platforms"].append((0, 0, 20, 600))
     level_data["platforms"].append((780, 0, 20, 600))
     
-    # --- EASY LEVEL 1 OVERRIDE ---
-    if level_num == 1:
-        level_data["platforms"].extend([
-            (20, 500, 250, 100),   # Massive Starting Floor
-            (320, 420, 200, 30),   # Very large middle step
-            (570, 320, 190, 30)    # Wide goal platform
-        ])
-        level_data["goal"] = (640, 260)  # Safe portal placement
+    # --- PULL HANDMADE MID-EASY LEVELS ---
+    if level_num in HANDCRAFTED_LEVELS:
+        level_data["platforms"].extend(HANDCRAFTED_LEVELS[level_num]["platforms"])
+        level_data["goal"] = HANDCRAFTED_LEVELS[level_num]["goal"]
         return level_data
 
-    # --- RANDOM GENERATION LOGIC FOR LEVELS 2 - 500 ---
-    random.seed(level_num + 999)
+    # --- DOUBLE JUMP CALCULATED PROCEDURAL MAPS (LEVELS 11 - 50) ---
+    random.seed(level_num + 777)
     
-    # Starting Floor platform for procedurally generated maps
-    level_data["platforms"].append((20, 500, 200, 100))
+    # Starting Floor platform
+    level_data["platforms"].append((20, 500, 160, 100))
     
-    # Calculate difficulty scaling ratios (0.0 to 1.0) based on reaching level 500
-    progression = min(level_num / 500.0, 1.0)
+    # Scale up platform difficulty as the index moves up towards 50
+    progression = min((level_num - 11) / 39.0, 1.0)
     
-    # Tweak platform sizes depending on how deep the level index is
-    min_width = int(120 - (progression * 50))  
-    max_width = int(180 - (progression * 60))  
+    min_width = int(110 - (progression * 30))  # Shrinks down to 80px wide
+    max_width = int(160 - (progression * 30))  
     
     current_x = 150
-    current_y = 450
+    current_y = 440
     
-    # Snake pattern generation ascending upwards to the goal height
     while current_y > 150:
         p_width = random.randint(min_width, max_width)
         p_height = 20
         
-        # Decide next jump direction or add vertical wall-jump pillars
-        if random.random() < 0.25 * progression:
-            level_data["platforms"].append((current_x + 30, current_y - 80, 40, 100))
-            current_y -= 120
+        # Inject Wall-Jump vertical pillars
+        if random.random() < 0.20 * progression:
+            level_data["platforms"].append((current_x + 20, current_y - 80, 40, 90))
+            current_y -= 110
         else:
             level_data["platforms"].append((current_x, current_y, p_width, p_height))
             
-            gap_x = random.randint(80, int(130 + (progression * 50)))
-            gap_y = random.randint(70, 100)
+            # Double Jump distance tracking scaling bounds
+            gap_x = random.randint(110, int(150 + (progression * 60)))  # Extended gaps to reward double jumps
+            gap_y = random.randint(65, 95)
             
             if current_x + p_width + gap_x > 740:
-                current_x = random.randint(40, 150)
+                current_x = random.randint(40, 160)
             else:
                 current_x += p_width + gap_x
                 
             current_y -= gap_y
 
-    # Place the ultimate goal pad on the last platform sequence
-    goal_platform_x = random.randint(100, 500)
-    level_data["platforms"].append((goal_platform_x, 130, 150, 20))
-    level_data["goal"] = (goal_platform_x + 55, 70)
+    # Cap stage with target pad destination
+    goal_platform_x = random.randint(120, 500)
+    level_data["platforms"].append((goal_platform_x, 140, 140, 20))
+    level_data["goal"] = (goal_platform_x + 50, 80)
     
     return level_data
 
@@ -217,7 +249,7 @@ def generate_procedural_level(level_num):
 def main():
     pygame.init()
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-    pygame.display.set_caption("Scratch Ninja - 500 Level Edition")
+    pygame.display.set_caption("Scratch Ninja - 50 Level Edition")
     clock = pygame.time.Clock()
     font = pygame.font.SysFont("Arial", 24)
 
@@ -226,67 +258,9 @@ def main():
     stars = pygame.sprite.Group()
     goals = pygame.sprite.Group()
 
-    # Fixed starting position to spawn exactly on top of the new y=500 platform
-    player = Player(60, 450)
+    player = Player(60, 440)
     all_sprites.add(player)
 
     current_idx = 1  
-    MAX_LEVELS = 500
+    MAX_LEVELS = 50
 
-    def load_level(idx):
-        for sprite in platforms: sprite.kill()
-        for sprite in goals: sprite.kill()
-        for sprite in stars: sprite.kill()
-
-        # Build dynamic environment algorithm layout
-        generated_level = generate_procedural_level(idx)
-        
-        for p in generated_level["platforms"]:
-            plat = Platform(*p)
-            platforms.add(plat)
-            all_sprites.add(plat)
-            
-        gx, gy = generated_level["goal"]
-        goal = Goal(gx, gy)
-        goals.add(goal)
-        all_sprites.add(goal)
-
-        # Reposition ninja safely at spawn coordinates on top of the platform
-        player.rect.topleft = (60, 450)
-        player.vx, player.vy = 0, 0
-
-    load_level(current_idx)
-    running = True
-    win_state = False
-
-    while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-
-        if not win_state:
-            player.handle_input(all_sprites, stars)
-            player.update(platforms)
-            stars.update(platforms)
-
-            # Check portal touching conditions
-            if pygame.sprite.spritecollideany(player, goals):
-                current_idx += 1
-                if current_idx <= MAX_LEVELS:
-                    load_level(current_idx)
-                else:
-                    win_state = True
-
-            # Respawn if falling out of screen space
-            if player.rect.top > SCREEN_HEIGHT:
-                player.rect.topleft = (60, 450)
-                player.vx, player.vy = 0, 0
-
-        screen.fill(COLOR_BG)
-        all_sprites.draw(screen)
-
-        if win_state:
-            txt = font.render("YOU CONQUERED ALL 500 LEVELS!", True, COLOR_STAR)
-            screen.blit(txt, (SCREEN_WIDTH // 2 - 180, SCREEN_HEIGHT // 2))
-        else:
-main()
