@@ -73,20 +73,24 @@ class Player(pygame.sprite.Sprite):
             self.vx += RUN_SPEED
             self.facing_direction = 1
 
+        # Jump Input with single-press validation (prevents instantly consuming both jumps)
         jump_key = keys[pygame.K_UP] or keys[pygame.K_w] or keys[pygame.K_SPACE]
         if jump_key:
             if not self.jump_key_pressed:
                 self.jump_key_pressed = True
                 
+                # Case 1: Ground Jump
                 if self.is_grounded:
                     self.vy = JUMP_FORCE
                     self.is_grounded = False
                     self.jumps_remaining -= 1
+                # Case 2: Wall Jump (Takes precedence over double jump while on a wall)
                 elif self.on_wall != 0:  
                     self.vy = JUMP_FORCE
                     self.vx = -self.on_wall * (MAX_SPEED * 1.2)  
                     self.on_wall = 0
-                    self.jumps_remaining = self.max_jumps - 1 
+                    self.jumps_remaining = self.max_jumps - 1 # Grant a double jump fresh off a wall kick
+                # Case 3: Mid-air Double Jump
                 elif self.jumps_remaining > 0:
                     self.vy = JUMP_FORCE
                     self.jumps_remaining -= 1
@@ -111,7 +115,7 @@ class Player(pygame.sprite.Sprite):
         
         if self.on_wall != 0 and self.vy > WALL_SLIDE_SPEED:
             self.vy = WALL_SLIDE_SPEED
-            self.jumps_remaining = self.max_jumps 
+            self.jumps_remaining = self.max_jumps # Reset jumps while sliding down walls
 
         self.rect.x += int(self.vx)
         self.on_wall = 0
@@ -142,7 +146,7 @@ class Player(pygame.sprite.Sprite):
                         self.rect.bottom = platform.rect.top
                         self.vy = 0
                         self.is_grounded = True
-                        self.jumps_remaining = self.max_jumps 
+                        self.jumps_remaining = self.max_jumps # Reset jumps when touching the floor
                     elif self.vy < 0:
                         self.rect.top = platform.rect.bottom
                         self.vy = 0
@@ -166,15 +170,14 @@ class Goal(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(topleft=(x, y))
 
 
-# --- REVERSED PROCEDURAL GENERATOR ALGORITHM ---
+# --- PROCEDURAL GENERATOR ALGORITHM WITH TUTORIAL BYPASS ---
 def generate_procedural_level(level_num):
-    """ Generates layouts that become progressively EASIER up to level 500 """
+    """ Builds a guaranteed easy Level 1, then procedural maps up to level 500 """
     level_data = {"platforms": [], "goal": (0, 0)}
     
     level_data["platforms"].append((0, 0, 20, 600))
     level_data["platforms"].append((780, 0, 20, 600))
     
-    # Hand-made tutorial Level 1
     if level_num == 1:
         level_data["platforms"].extend([
             (0, 530, 300, 70),    
@@ -189,13 +192,9 @@ def generate_procedural_level(level_num):
     random.seed(level_num + 999)
     level_data["platforms"].append((0, 530, 200, 70)) 
     
-    # REVERSED PROGRESSION: Closer to 500 means the 'difficulty factor' approaches 0.0
-    # Level 2 = 1.0 (Hardest), Level 500 = 0.0 (Easiest)
-    difficulty_factor = 1.0 - min((level_num - 2) / 498.0, 1.0)
-    
-    # Platform widths: Level 2 shrinks to 70-120px. Level 500 expands to 220-300px wide!
-    min_width = int(220 - (difficulty_factor * 150))  
-    max_width = int(300 - (difficulty_factor * 180))  
+    progression = min(level_num / 500.0, 1.0)
+    min_width = int(120 - (progression * 50))  
+    max_width = int(180 - (progression * 60))  
     
     current_x = 150
     current_y = 450
@@ -204,17 +203,13 @@ def generate_procedural_level(level_num):
         p_width = random.randint(min_width, max_width)
         p_height = 20
         
-        # Pillars spawn heavily at early levels, but disappear completely later on
-        if random.random() < 0.35 * difficulty_factor:
+        if random.random() < 0.25 * progression:
             level_data["platforms"].append((current_x + 30, current_y - 80, 40, 100))
             current_y -= 120
         else:
             level_data["platforms"].append((current_x, current_y, p_width, p_height))
-            
-            # Gaps get significantly smaller at later levels
-            max_gap = int(90 + (difficulty_factor * 75))
-            gap_x = random.randint(50, max_gap) 
-            gap_y = random.randint(60, int(70 + (difficulty_factor * 25)))
+            gap_x = random.randint(80, int(120 + (progression * 50))) 
+            gap_y = random.randint(70, 95)
             
             if current_x + p_width + gap_x > 740:
                 current_x = random.randint(40, 150)
@@ -224,8 +219,8 @@ def generate_procedural_level(level_num):
             current_y -= gap_y
 
     goal_platform_x = random.randint(100, 500)
-    level_data["platforms"].append((goal_platform_x, 130, 200, 20))
-    level_data["goal"] = (goal_platform_x + 80, 70)
+    level_data["platforms"].append((goal_platform_x, 130, 150, 20))
+    level_data["goal"] = (goal_platform_x + 55, 70)
     
     return level_data
 
@@ -234,7 +229,7 @@ def generate_procedural_level(level_num):
 def main():
     pygame.init()
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-    pygame.display.set_caption("Scratch Ninja - 500 Level Reverse Edition")
+    pygame.display.set_caption("Scratch Ninja - 500 Level Edition")
     clock = pygame.time.Clock()
     font = pygame.font.SysFont("Arial", 24)
 
@@ -295,3 +290,8 @@ def main():
                 player.vx, player.vy = 0, 0
 
         screen.fill(COLOR_BG)
+        all_sprites.draw(screen)
+
+        if win_state:
+            txt = font.render("YOU CONQUERED ALL 500 LEVELS!", True, COLOR_STAR)
+main()
