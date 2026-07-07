@@ -135,3 +135,4 @@ def play_game():
     type_text(f"You survived until Floor {floor} and acquired {player.gold} total credits.")
 
 play_game()
+main()
