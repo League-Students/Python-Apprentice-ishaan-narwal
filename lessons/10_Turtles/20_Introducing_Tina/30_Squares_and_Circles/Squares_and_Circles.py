@@ -1,209 +1,277 @@
 import pygame
 import sys
+import math
 
 # --- CONSTANTS & CONFIGURATION ---
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
 FPS = 60
 
-# Colors (R, G, B)
-COLOR_BG = (30, 30, 40)
-COLOR_PLAYER = (50, 150, 255)
-COLOR_PLATFORM = (46, 204, 113)
+# Colors (Scratch Aesthetic)
+COLOR_BG = (15, 20, 30)         # Dark night sky
+COLOR_PLAYER = (231, 76, 60)     # Ninja Red
+COLOR_PLATFORM = (44, 62, 80)    # Dark slate bricks
 COLOR_TEXT = (255, 255, 255)
+COLOR_STAR = (241, 196, 15)     # Glowing Kunai/Star gold
 
-# Physics Settings
-GRAVITY = 0.8
-PLAYER_SPEED = 6
-PLAYER_JUMP = -16
+# Physics Settings (Tweaked for crisp Scratch-like responses)
+GRAVITY = 0.6
+FRICTION = 0.85
+RUN_SPEED = 0.9
+MAX_SPEED = 7
+JUMP_FORCE = -13
+WALL_SLIDE_SPEED = 2
 
 # --- CLASSES ---
+
+class NinjaStar(pygame.sprite.Sprite):
+    """ A basic throwing projectile reminiscent of Scratch clone weapons """
+    def __init__(self, x, y, direction):
+        super().__init__()
+        self.image = pygame.Surface((12, 12), pygame.SRCALPHA)
+        # Draw a little star/diamond diamond shape
+        pygame.draw.polygon(self.image, COLOR_STAR, [(6,0), (12,6), (6,12), (0,6)])
+        self.rect = self.image.get_rect(center=(x, y))
+        self.speed = 12 * direction
+        self.life = 40  # Disappears after traveling a certain distance
+
+    def update(self, platforms):
+        self.rect.x += self.speed
+        self.life -= 1
+        # Destroy star if it hits a wall or runs out of lifetime
+        if pygame.sprite.spritecollideany(self, platforms) or self.life <= 0:
+            self.kill()
+
+
 class Player(pygame.sprite.Sprite):
     def __init__(self, x, y):
         super().__init__()
-        self.image = pygame.Surface((40, 40))
+        self.image = pygame.Surface((32, 44))
         self.image.fill(COLOR_PLAYER)
+        # Headband tail detail for visual flair
+        pygame.draw.rect(self.image, (255, 255, 255), (0, 8, 12, 6)) 
+        
         self.rect = self.image.get_rect()
         self.rect.topleft = (x, y)
 
         # Movement properties
-        self.velocity_x = 0
-        self.velocity_y = 0
+        self.vx = 0
+        self.vy = 0
         self.is_grounded = False
+        self.facing_direction = 1  # 1 = Right, -1 = Left
+        self.on_wall = 0          # -1 = Wall on left, 1 = Wall on right, 0 = No wall
+        self.shoot_cooldown = 0
 
-    def handle_input(self):
+    def handle_input(self, all_sprites, stars):
         keys = pygame.key.get_pressed()
-        self.velocity_x = 0
-        if keys[pygame.K_LEFT]:
-            self.velocity_x = -PLAYER_SPEED
-        if keys[pygame.K_RIGHT]:
-            self.velocity_x = PLAYER_SPEED
-        if keys[pygame.K_UP] or keys[pygame.K_SPACE]:
+        
+        # Horizontal acceleration (Scratch-like smooth inertia)
+        if keys[pygame.K_LEFT] or keys[pygame.K_a]:
+            self.vx -= RUN_SPEED
+            self.facing_direction = -1
+        elif keys[pygame.K_RIGHT] or keys[pygame.K_d]:
+            self.vx += RUN_SPEED
+            self.facing_direction = 1
+
+        # Jump & Wall Jump
+        if keys[pygame.K_UP] or keys[pygame.K_w] or keys[pygame.K_SPACE]:
             if self.is_grounded:
-                self.velocity_y = PLAYER_JUMP
+                self.vy = JUMP_FORCE
                 self.is_grounded = False
+            elif self.on_wall != 0:  # Wall jump mechanic!
+                self.vy = JUMP_FORCE
+                self.vx = -self.on_wall * (MAX_SPEED * 1.2)  # Kick away from wall
+                self.on_wall = 0
+
+        # Throw Ninja Star (F or Return key)
+        if (keys[pygame.K_f] or keys[pygame.K_RETURN]) and self.shoot_cooldown == 0:
+            star = NinjaStar(self.rect.centerx, self.rect.centery, self.facing_direction)
+            all_sprites.add(star)
+            stars.add(star)
+            self.shoot_cooldown = 15  # Frame cooldown limit
+
+        if self.shoot_cooldown > 0:
+            self.shoot_cooldown -= 1
 
     def update(self, platforms):
-        # Apply Gravity
-        self.velocity_y += GRAVITY
+        # Apply physics formulas
+        self.vx *= FRICTION
+        self.vy += GRAVITY
 
-        # Horizontal Movement and Collision
-        self.rect.x += self.velocity_x
+        # Cap terminal velocities
+        if abs(self.vx) > MAX_SPEED:
+            self.vx = math.copysign(MAX_SPEED, self.vx)
+        
+        # Wall slide restriction
+        if self.on_wall != 0 and self.vy > WALL_SLIDE_SPEED:
+            self.vy = WALL_SLIDE_SPEED
+
+        # X Movement & Intercepts
+        self.rect.x += int(self.vx)
+        self.on_wall = 0
         self.collide_with_platforms(platforms, "horizontal")
 
-        # Vertical Movement and Collision
-        self.rect.y += self.velocity_y
-        self.is_grounded = False  # Reset before checking collisions
+        # Y Movement & Intercepts
+        self.rect.y += int(self.vy)
+        self.is_grounded = False
         self.collide_with_platforms(platforms, "vertical")
 
     def collide_with_platforms(self, platforms, direction):
+        # Tiny expanding check box to capture wall touch parameters
+        check_rect = self.rect.inflate(2, 0) if direction == "horizontal" else self.rect
+
         for platform in platforms:
-            if self.rect.colliderect(platform.rect):
+            if check_rect.colliderect(platform.rect):
                 if direction == "horizontal":
-                    if self.velocity_x > 0:  # Moving right
+                    if self.vx > 0:
                         self.rect.right = platform.rect.left
-                    elif self.velocity_x < 0:  # Moving left
+                        if not self.is_grounded:
+                            self.on_wall = 1
+                        self.vx = 0
+                    elif self.vx < 0:
                         self.rect.left = platform.rect.right
+                        if not self.is_grounded:
+                            self.on_wall = -1
+                        self.vx = 0
                 elif direction == "vertical":
-                    if self.velocity_y > 0:  # Falling down
+                    if self.vy > 0:
                         self.rect.bottom = platform.rect.top
-                        self.velocity_y = 0
+                        self.vy = 0
                         self.is_grounded = True
-                    elif self.velocity_y < 0:  # Jumping up
+                    elif self.vy < 0:
                         self.rect.top = platform.rect.bottom
-                        self.velocity_y = 0
+                        self.vy = 0
+
 
 class Platform(pygame.sprite.Sprite):
     def __init__(self, x, y, width, height):
         super().__init__()
         self.image = pygame.Surface((width, height))
         self.image.fill(COLOR_PLATFORM)
-        self.rect = self.image.get_rect()
-        self.rect.topleft = (x, y)
+        # Rim outline accent
+        pygame.draw.rect(self.image, (52, 73, 94), (0, 0, width, height), 2)
+        self.rect = self.image.get_rect(topleft=(x, y))
 
-# --- MAIN GAME LOOP ---
+
+class Goal(pygame.sprite.Sprite):
+    """ The portal or gate to progress levels """
+    def __init__(self, x, y):
+        super().__init__()
+        self.image = pygame.Surface((40, 60))
+        self.image.fill((155, 89, 182)) # Purple Portal
+        pygame.draw.rect(self.image, (255, 255, 255), (5, 5, 30, 50), 2)
+        self.rect = self.image.get_rect(topleft=(x, y))
+
+
+# --- MAIN LOOP ---
 def main():
     pygame.init()
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-    pygame.display.set_caption("Python 2D Platformer - Multi-Level")
+    pygame.display.set_caption("Scratch Ninja Platformer Engine")
     clock = pygame.time.Clock()
-    font = pygame.font.SysFont(None, 36)
+    font = pygame.font.SysFont("Arial", 24)
 
-    # Sprite Groups
     all_sprites = pygame.sprite.Group()
     platforms = pygame.sprite.Group()
+    stars = pygame.sprite.Group()
+    goals = pygame.sprite.Group()
 
-    # Create Player
-    player = Player(100, 400)
+    player = Player(80, 450)
     all_sprites.add(player)
 
-    # Design Multiple Levels (x, y, width, height)
-    levels = {
-        1: [
-            (0, 560, 800, 40),  # Floor
-            (300, 450, 200, 20),
-            (100, 340, 150, 20),
-            (550, 300, 180, 20),
-            (350, 180, 120, 20)
-        ],
-        2: [
-            (0, 560, 800, 40),  # Floor
-            (100, 450, 120, 20),
-            (300, 380, 120, 20),
-            (500, 300, 120, 20),
-            (300, 200, 120, 20)
-        ],
-        3: [
-            (0, 560, 400, 40),  # Partial Floor
-            (450, 560, 350, 40), # Separate Floor
-            (150, 450, 100, 20),
-            (300, 350, 100, 20),
-            (450, 250, 100, 20),
-            (600, 150, 100, 20)
-        ]
-    }
-    
-    current_level = 1
-    max_level = len(levels)
+    # Scratch Level Array Layout Maps
+    levels = [
+        # Level 1 Layout Map
+        {
+            "platforms": [
+                (0, 550, 800, 50),     # Floor
+                (0, 0, 20, 600),       # Left Bound Wall
+                (780, 0, 20, 600),     # Right Bound Wall
+                (250, 420, 160, 20),   # Jump step 1
+                (480, 310, 160, 20),   # Jump step 2
+                (200, 200, 200, 20),   # Goal platform
+            ],
+            "goal": (220, 140)
+        },
+        # Level 2 Layout Map (Emphasizing Wall Jumps)
+        {
+            "platforms": [
+                (0, 550, 800, 50),
+                (0, 0, 20, 600),
+                (780, 0, 20, 600),
+                (380, 280, 40, 270),   # Central pillar tower to scale
+                (180, 420, 100, 20),
+                (520, 420, 100, 20),
+                (180, 220, 120, 20),
+                (500, 140, 150, 20),
+            ],
+            "goal": (550, 80)
+        }
+    ]
 
-    def load_level(level_num):
-        # Clear previous platforms
-        platforms.empty()
-        
-        # Remove only platforms from all_sprites (keep player)
-        for sprite in all_sprites:
-            if isinstance(sprite, Platform):
-                sprite.kill()
+    current_idx = 0
 
-        # Add new platforms
-        for p in levels[level_num]:
-            plat = Platform(p[0], p[1], p[2], p[3])
-            all_sprites.add(plat)
+    def load_level(idx):
+        # Wipe old assets clean
+        for sprite in platforms: sprite.kill()
+        for sprite in goals: sprite.kill()
+        for sprite in stars: sprite.kill()
+
+        # Build environments
+        for p in levels[idx]["platforms"]:
+            plat = Platform(*p)
             platforms.add(plat)
+            all_sprites.add(plat)
+        
+        gx, gy = levels[idx]["goal"]
+        goal = Goal(gx, gy)
+        goals.add(goal)
+        all_sprites.add(goal)
 
-    # Load initial level
-    load_level(current_level)
+        # Reposition ninja to base
+        player.rect.topleft = (80, 450)
+        player.vx, player.vy = 0, 0
 
-    # Game Run Flag
+    load_level(current_idx)
     running = True
-    game_complete = False
+    win_state = False
 
     while running:
-        # 1. Event Handling
+        # 1. Event Checks
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_r:  # Reset Player
-                    player.rect.topleft = (100, 400)
-                    player.velocity_x = 0
-                    player.velocity_y = 0
-                if event.key == pygame.K_SPACE and game_complete: # Restart Game
-                    current_level = 1
-                    game_complete = False
-                    player.rect.topleft = (100, 400)
-                    load_level(current_level)
 
-        # Only process physics/input if the game isn't finished
-        if not game_complete:
-            # 2. Physics & Logic Updates
-            player.handle_input()
+        if not win_state:
+            # 2. Update Actions & Variables
+            player.handle_input(all_sprites, stars)
             player.update(platforms)
+            stars.update(platforms)
 
-            # Check Level Completion (Reach the right edge of the screen)
-            if player.rect.left >= SCREEN_WIDTH:
-                current_level += 1
-                if current_level > max_level:
-                    game_complete = True
+            # Hit the purple portal trigger
+            if pygame.sprite.spritecollideany(player, goals):
+                current_idx += 1
+                if current_idx < len(levels):
+                    load_level(current_idx)
                 else:
-                    load_level(current_level)
-                    # Respawn at the left side for the next level
-                    player.rect.topleft = (50, 400)
-                    player.velocity_x = 0
-                    player.velocity_y = 0
+                    win_state = True
 
-        # 3. Drawing / Rendering
+            # Drop off-screen reset loop
+            if player.rect.top > SCREEN_HEIGHT:
+                player.rect.topleft = (80, 450)
+                player.vx, player.vy = 0, 0
+
+        # 3. Graphics Rendering
         screen.fill(COLOR_BG)
         all_sprites.draw(screen)
 
-        # UI Text Instructions
-        if game_complete:
-            win_text1 = font.render("YOU BEAT ALL LEVELS!", True, COLOR_TEXT)
-            win_text2 = font.render("Press SPACE to Restart", True, COLOR_PLATFORM)
-            screen.blit(win_text1, (SCREEN_WIDTH // 2 - 140, SCREEN_HEIGHT // 2 - 30))
-            screen.blit(win_text2, (SCREEN_WIDTH // 2 - 145, SCREEN_HEIGHT // 2 + 20))
+        # UI & HUD Displays
+        if win_state:
+            txt = font.render("MISSION ACCOMPLISHED, SHINOBI!", True, COLOR_STAR)
+            screen.blit(txt, (SCREEN_WIDTH // 2 - 180, SCREEN_HEIGHT // 2))
         else:
-            instructions = font.render("Arrows/Space to Move | R to Reset", True, COLOR_TEXT)
-            screen.blit(instructions, (20, 20))
-            
-            # Level Display
-            level_text = font.render(f"Level: {current_level}", True, COLOR_TEXT)
-            screen.blit(level_text, (SCREEN_WIDTH - 120, 20))
-
-        # Check if out of bounds (Fell down)
-        if player.rect.top > SCREEN_HEIGHT and not game_complete:
-            game_over_text = font.render("YOU FELL! Press R to Restart", True, (255, 87, 34))
-            screen.blit(game_over_text, (SCREEN_WIDTH // 2 - 170, SCREEN_HEIGHT // 2))
+            hud = font.render(f"Level: {current_idx + 1}  | Controls: WASD/Arrows to Move/Wall Jump | F to Shoot", True, COLOR_TEXT)
+            screen.blit(hud, (20, 20))
 
         pygame.display.flip()
         clock.tick(FPS)
