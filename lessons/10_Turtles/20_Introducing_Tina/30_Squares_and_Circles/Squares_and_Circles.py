@@ -28,7 +28,7 @@ WALL_SLIDE_SPEED = 2
 class NinjaStar(pygame.sprite.Sprite):
     def __init__(self, x, y, direction):
         super().__init__()
-        self.image = pygame.Surface((7, 12), pygame.SRCALPHA)
+        self.image = pygame.Surface((12, 12), pygame.SRCALPHA)
         pygame.draw.polygon(self.image, COLOR_STAR, [(6,0), (12,6), (6,12), (0,6)])
         self.rect = self.image.get_rect(center=(x, y))
         self.speed = 12 * direction
@@ -151,14 +151,24 @@ class Goal(pygame.sprite.Sprite):
 # --- PROCEDURAL GENERATOR ALGORITHM ---
 def generate_procedural_level(level_num):
     """ Dynamically builds mathematically beatable levels up to level 500 """
-    # Set seed so level layouts remain persistent based on the level number
-    random.seed(level_num + 999)
-    
     level_data = {"platforms": [], "goal": (0, 0)}
     
-    # Boundary Walls
+    # Boundary Walls (Always load to keep the player inside screen bounds)
     level_data["platforms"].append((0, 0, 20, 600))
     level_data["platforms"].append((780, 0, 20, 600))
+    
+    # --- EASY LEVEL 1 OVERRIDE ---
+    if level_num == 1:
+        level_data["platforms"].extend([
+            (20, 500, 250, 100),   # Massive Starting Floor
+            (320, 420, 200, 30),   # Very large middle step
+            (570, 320, 190, 30)    # Wide goal platform
+        ])
+        level_data["goal"] = (640, 260)  # Safe portal placement
+        return level_data
+
+    # --- RANDOM GENERATION LOGIC FOR LEVELS 2 - 500 ---
+    random.seed(level_num + 999)
     
     # Starting Floor platform
     level_data["platforms"].append((0, 530, 200, 70))
@@ -237,14 +247,14 @@ def main():
             plat = Platform(*p)
             platforms.add(plat)
             all_sprites.add(plat)
-        
+            
         gx, gy = generated_level["goal"]
         goal = Goal(gx, gy)
         goals.add(goal)
         all_sprites.add(goal)
 
-        # Reposition ninja
-        player.rect.topleft = (40, 450)
+        # Reposition ninja safely at spawn coordinates
+        player.rect.topleft = (80, 420)
         player.vx, player.vy = 0, 0
 
     load_level(current_idx)
@@ -271,7 +281,7 @@ def main():
 
             # Respawn if falling out of screen space
             if player.rect.top > SCREEN_HEIGHT:
-                player.rect.topleft = (40, 450)
+                player.rect.topleft = (80, 420)
                 player.vx, player.vy = 0, 0
 
         screen.fill(COLOR_BG)
@@ -279,16 +289,4 @@ def main():
 
         if win_state:
             txt = font.render("YOU CONQUERED ALL 500 LEVELS!", True, COLOR_STAR)
-            screen.blit(txt, (SCREEN_WIDTH // 2 - 180, SCREEN_HEIGHT // 2))
-        else:
-            hud = font.render(f"Level: {current_idx} / {MAX_LEVELS}  | Controls: WASD/Arrows to Move | F to Shoot", True, COLOR_TEXT)
-            screen.blit(hud, (20, 20))
-
-        pygame.display.flip()
-        clock.tick(FPS)
-
-    pygame.quit()
-    sys.exit()
-
-if __name__ == "__main__":
-    main()
+main()
