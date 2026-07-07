@@ -28,7 +28,7 @@ WALL_SLIDE_SPEED = 2
 class NinjaStar(pygame.sprite.Sprite):
     def __init__(self, x, y, direction):
         super().__init__()
-        self.image = pygame.Surface((12, 12), pygame.SRCALPHA)
+        self.image = pygame.Surface((7, 12), pygame.SRCALPHA)
         pygame.draw.polygon(self.image, COLOR_STAR, [(6,0), (12,6), (6,12), (0,6)])
         self.rect = self.image.get_rect(center=(x, y))
         self.speed = 12 * direction
