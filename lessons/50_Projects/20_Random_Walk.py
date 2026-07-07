@@ -2,6 +2,7 @@ import random
 import time
 import sys
 
+# Smooth text scrolling effect
 def type_text(text, delay=0.02):
     for char in text:
         sys.stdout.write(char)
@@ -9,6 +10,7 @@ def type_text(text, delay=0.02):
         time.sleep(delay)
     print()
 
+# Character Stats Setup
 class Player:
     def __init__(self):
         self.hp = 100
@@ -18,6 +20,7 @@ class Player:
         self.weapon = "Rusty Cyber-Blade"
         self.inventory = ["Nano-Bandaid"]
 
+# Random Enemy Generator
 class Enemy:
     def __init__(self, floor):
         prefixes = ["Glitchy", "Corrupted", "Neon", "Overclocked", "Quantum"]
@@ -27,6 +30,7 @@ class Enemy:
         self.attack = random.randint(8, 15) + (floor * 3)
         self.gold = random.randint(10, 40) + (floor * 5)
 
+# Main Game Loop
 def play_game():
     player = Player()
     floor = 1
@@ -38,7 +42,7 @@ def play_game():
         type_text(f"\n--- 💾 GRID FLOOR: {floor} ---")
         type_text(f"HP: {player.hp}/{player.max_hp} | Weapon: {player.weapon} | Gold: {player.gold}💵")
         
-        # Randomly generate room layout/event
+        # Pick room type randomly
         room_event = random.choice(["combat", "combat", "loot", "mystery", "shop"])
         
         if room_event == "combat":
@@ -49,12 +53,12 @@ def play_game():
                 action = input("Do you want to (A)ttack, (U)se Item, or (R)un? ").lower()
                 
                 if action == 'a':
-                    dmg_to_enemy = random.randint(int(player.attack*0.8), int(player.attack*1.2))
+                    dmg_to_enemy = random.randint(int(player.attack * 0.8), int(player.attack * 1.2))
                     enemy.hp -= dmg_to_enemy
                     type_text(f"⚔️ You slash the {enemy.name} with your {player.weapon} for {dmg_to_enemy} dmg!")
                     
                     if enemy.hp > 0:
-                        dmg_to_player = random.randint(int(enemy.attack*0.8), int(enemy.attack*1.2))
+                        dmg_to_player = random.randint(int(enemy.attack * 0.8), int(enemy.attack * 1.2))
                         player.hp -= dmg_to_player
                         type_text(f"⚡ The {enemy.name} counters and hits you for {dmg_to_player} dmg!")
                 
@@ -109,30 +113,24 @@ def play_game():
                 
         elif room_event == "shop":
             type_text(f"🏪 A friendly Black-Market Drone hovers near. You have {player.gold} credits.")
-            buy = input("Buy 'Nano-Bandaid' for 30 credits? (y/n): ").lower()
-            if buy == 'y' and player.gold >= 30:
-                player.gold -= 30
-                player.inventory.append("Nano-Bandaid")
-                type_text("🛍️ Purchase confirmed! Item added to grid storage.")
+           
+            if buy == 'y':
+                if player.gold >= 30:
+                    player.gold -= 30
+                    player.inventory.append("Nano-Bandaid")
+                    type_text("🛍️ Purchase confirmed! Item added to grid storage.")
+                else:
+                    type_text("❌ Insufficient credits!")
             else:
                 type_text("You wave the drone away.")
 
         if player.hp > 0:
-                         if action == 'a':
-                    # Fixes line 121: Dynamically calculates combat scaling based on your weapon
-                    dmg_to_enemy = random.randint(int(player.attack * 0.8), int(player.attack * 1.2))
-                    enemy.hp -= dmg_to_enemy
-                    type_text(f"⚔️ You slash the {enemy.name} with your {player.weapon} for {dmg_to_enemy} dmg!")
-                    
-                    if enemy.hp > 0:
-                        dmg_to_player = random.randint(int(enemy.attack * 0.8), int(enemy.attack * 1.2))
-                        player.hp -= dmg_to_player
-                        type_text(f"⚡ The {enemy.name} counters and hits you for {dmg_to_player} dmg!")
-
+            input("\n[Press Enter to advance deeper into the grid...]")
             floor += 1
 
     type_text("\n💀 SYSTEM CRASH... PLAYER FLATLINED. GAME OVER. 💀")
     type_text(f"You survived until Floor {floor} and acquired {player.gold} total credits.")
 
-play_game()
-main()
+# Run the game launcher
+if __name__ == "__main__":
+    play_game()
