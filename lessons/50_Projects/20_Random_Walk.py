@@ -118,7 +118,17 @@ def play_game():
                 type_text("You wave the drone away.")
 
         if player.hp > 0:
-            input("\n[Press Enter to advance deeper into the grid...]")
+                         if action == 'a':
+                    # Fixes line 121: Dynamically calculates combat scaling based on your weapon
+                    dmg_to_enemy = random.randint(int(player.attack * 0.8), int(player.attack * 1.2))
+                    enemy.hp -= dmg_to_enemy
+                    type_text(f"⚔️ You slash the {enemy.name} with your {player.weapon} for {dmg_to_enemy} dmg!")
+                    
+                    if enemy.hp > 0:
+                        dmg_to_player = random.randint(int(enemy.attack * 0.8), int(enemy.attack * 1.2))
+                        player.hp -= dmg_to_player
+                        type_text(f"⚡ The {enemy.name} counters and hits you for {dmg_to_player} dmg!")
+
             floor += 1
 
     type_text("\n💀 SYSTEM CRASH... PLAYER FLATLINED. GAME OVER. 💀")
