@@ -1,103 +1,129 @@
 import pygame
 import sys
+import random
 
 # Initialize Pygame
 pygame.init()
 
-# Game Setup
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 600
+# Game Display Options
+SCREEN_WIDTH = 900
+SCREEN_HEIGHT = 500
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption("Shadow Ninja: The Ascent")
+pygame.display.set_caption("Geometry Dash: POLTERGEIST (Wave Mode)")
 clock = pygame.time.Clock()
 
-# Colors (RGB)
-BG_COLOR = (20, 24, 33)       # Dark midnight blue
-NINJA_COLOR = (40, 40, 40)     # Dark gray outfit
-HEADBAND_COLOR = (220, 20, 60) # Crimson red
-PLATFORM_COLOR = (70, 80, 95)  # Slate gray
-GOAL_COLOR = (255, 215, 0)     # Gold
+# Nine Circles Color Palette
+BLACK = (10, 10, 10)
+WHITE = (255, 255, 255)
+WAVE_COLOR = (0, 255, 255)     # Cyan wave icon
 
-# Player (Ninja) Properties
-player_rect = pygame.Rect(50, 500, 30, 45) # X, Y, Width, Height
-player_velocity_y = 0
-player_speed = 6
-is_grounded = False
-
-# Platforms Layout [X, Y, Width, Height]
-platforms = [
-    pygame.Rect(0, 560, 800, 40),     # Main floor
-    pygame.Rect(200, 450, 150, 20),   # First ledge
-    pygame.Rect(450, 360, 180, 20),   # Second ledge
-    pygame.Rect(250, 250, 150, 20),   # Third ledge
-    pygame.Rect(550, 160, 150, 20),   # Final ledge
+# Define the tight, chaotic Poltergeist map structure
+# Formatting: (X_position, Top_Wall_Height, Bottom_Wall_Y_Position)
+# Gives that iconic "extremely narrow tunnel" experience
+level_obstacles = [
+    (200, 150, 350), (300, 180, 330), (400, 120, 360),
+    (500, 200, 310), (600, 140, 340), (700, 220, 300),
+    (800, 160, 350), (900, 110, 370), (1000, 190, 320),
+    (1100, 230, 290), (1200, 130, 360), (1300, 170, 340),
+    (1400, 210, 310), (1500, 150, 350), (1600, 100, 390)
 ]
 
-# Win Condition Goal
-goal_rect = pygame.Rect(600, 110, 30, 30)
+# Game Variables
+camera_x = 0
+game_speed = 5
+
+# Wave Player Setup (X starts fixed, Y controls physics)
+player_x = 100
+player_y = 250
+wave_speed_y = 5
+trail_points = []
 
 # Main Game Loop
 running = True
+flash_counter = 0
+
 while running:
-    # 1. Handle Input Events
+    # 1. Handle Closing Window
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-            
+
+    # 2. Controls: Hold SPACE to fly up, Release to dive down
     keys = pygame.key.get_pressed()
+    if keys[pygame.K_SPACE]:
+        player_y -= wave_speed_y  # Move diagonally up
+    else:
+        player_y += wave_speed_y  # Move diagonally down
+
+    # Camera moves horizontally through the map automatically
+    camera_x += game_speed
+    current_player_global_x = player_x + camera_x
+
+    # Keep track of the wave's path to draw the iconic neon trail
+    trail_points.append((player_x, player_y))
+    if len(trail_points) > 40:
+        trail_points.pop(0)
+
+    # 3. Handle the Flashing Nine Circles Background Effect
+    flash_counter += 1
+    if flash_counter % 6 < 3:
+        # Alternates dark red styles rapidly to look like the real game
+        bg_color = (60, 0, 0) if (flash_counter // 6) % 2 == 0 else (20, 0, 0)
+        obstacle_color = (255, 40, 40)
+    else:
+        bg_color = BLACK
+        obstacle_color = (150, 0, 0)
+
+    # Draw Background
+    screen.fill(bg_color)
+
+    # 4. Render Obstacles and Test for Collisions
+    player_rect = pygame.Rect(player_x, player_y, 16, 16)
     
-    # Left/Right movement
-    if keys[pygame.K_LEFT]:
-        player_rect.x -= player_speed
-    if keys[pygame.K_RIGHT]:
-        player_rect.x += player_speed
-        
-    # Ninja Jump (Only if standing on a platform)
-    if keys[pygame.K_SPACE] and is_grounded:
-        player_velocity_y = -15
-        is_grounded = False
-
-    # 2. Physics & Gravity
-    player_velocity_y += 0.8 # Gravity strength
-    player_rect.y += player_velocity_y
-
-    # 3. Collision Detection
-    is_grounded = False
-    for platform in platforms:
-        if player_rect.colliderect(platform):
-            # Check if ninja is falling down onto the top of a platform
-            if player_velocity_y > 0 and player_rect.bottom <= platform.top + 15:
-                player_rect.bottom = platform.top
-                player_velocity_y = 0
-                is_grounded = True
-
-    # Screen Boundary Check
-    if player_rect.left < 0: player_rect.left = 0
-    if player_rect.right > SCREEN_WIDTH: player_rect.right = SCREEN_WIDTH
-
-    # Win Condition Check
-    if player_rect.colliderect(goal_rect):
-        print("🏆 Victory! The Ninja recovered the ancient scroll!")
+    # Floor and Ceiling boundaries
+    if player_y < 0 or player_y > SCREEN_HEIGHT - 16:
+        print("💥 CRASHED! Poltergeist demands perfect precision!")
         running = False
 
-    # 4. Drawing Everything
-    screen.fill(BG_COLOR)
-    
-    # Draw platforms
-    for platform in platforms:
-        pygame.draw.rect(screen, PLATFORM_COLOR, platform)
-        
-    # Draw Golden Scroll Goal
-    pygame.draw.rect(screen, GOAL_COLOR, goal_rect)
-    
-    # Draw Ninja (Body + Headband trail)
-    pygame.draw.rect(screen, NINJA_COLOR, player_rect)
-    headband_rect = pygame.Rect(player_rect.x - 5, player_rect.y + 8, 15, 6)
-    pygame.draw.rect(screen, HEADBAND_COLOR, headband_rect)
+    for obs_x, top_height, bot_y in level_obstacles:
+        # Map global level positions to matching screen positions
+        screen_x = obs_x - camera_x
 
-    # Refresh Screen
+        # Only process objects currently visible on screen
+        if -100 < screen_x < SCREEN_WIDTH + 100:
+            top_block = pygame.Rect(screen_x, 0, 60, top_height)
+            bot_block = pygame.Rect(screen_x, bot_y, 60, SCREEN_HEIGHT - bot_y)
+
+            # Draw the glowing grid hazards
+            pygame.draw.rect(screen, obstacle_color, top_block)
+            pygame.draw.rect(screen, obstacle_color, bot_block)
+            pygame.draw.rect(screen, WHITE, top_block, 1) # White outline grid
+            pygame.draw.rect(screen, WHITE, bot_block, 1)
+
+            # Accurate hitbox verification
+            if player_rect.colliderect(top_block) or player_rect.colliderect(bot_block):
+                print("💥 Exploded into icons! Try again to master the spacing!")
+                running = False
+
+    # 5. Draw the Wave Trail and Player Icon
+    if len(trail_points) > 1:
+        pygame.draw.lines(screen, WAVE_COLOR, False, trail_points, 3)
+    
+    # Draw the main triangle wave projectile
+    pygame.draw.polygon(screen, WHITE, [
+        (player_x + 16, player_y + 8), 
+        (player_x, player_y), 
+        (player_x, player_y + 16)
+    ])
+
+    # End Level Win Trigger
+    if camera_x > 1650:
+        print("🎉 VICTORY! You survived Poltergeist!")
+        running = False
+
+    # Display loop adjustments
     pygame.display.flip()
-    clock.tick(60) # 60 Frames per second
+    clock.tick(60) # Smooth 60hz simulation framerate
 
 pygame.quit()
 sys.exit()
