@@ -43,7 +43,7 @@ for i in range(999):
     t.forward(flame_size)
     t.right(170)
     t.forward(flame_size)
-    t.right(62)
+    t.right(61)
     t.forward(base_size)
     t.end_fill()
 
