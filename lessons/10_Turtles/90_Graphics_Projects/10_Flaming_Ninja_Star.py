@@ -1,260 +1,148 @@
-import pygame
-import random
-import math
-
-# --- Initialization ---
+import pygame, random, sys
 pygame.init()
-WIDTH, HEIGHT = 800, 600
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Galactic Defender: Striker Edition")
+
+# --- Engine Configuration & Setup ---
+W, H = 800, 600
+screen = pygame.display.set_mode((W, H))
+pygame.display.set_caption("Galactic Defender: Celeron Edition")
 clock = pygame.time.Clock()
-FPS = 60
+font = pygame.font.SysFont("Arial", 20, bold=True)
 
-# --- Colors & Fonts ---
-FONT_MAIN = pygame.font.SysFont("Arial", 22, bold=True)
-FONT_TITLE = pygame.font.SysFont("Arial", 48, bold=True)
+# --- Optimized Game Object States (Simple Lists for CPU efficiency) ---
+px, py, pw, ph = 375, 540, 50, 40   # Player transform data
+p_health, score, tier = 100, 0, 1
+fire_cooldown, shield_timer, rapid_timer = 0, 0, 0
 
-COLOR_BG = (10, 8, 22)
-COLOR_PLAYER = (0, 255, 150)
-COLOR_SHIELD = (0, 190, 255)
-COLOR_ENEMY = (255, 60, 60)
-COLOR_BULLET_P = (0, 255, 255)
-COLOR_BULLET_B = (255, 130, 0)
-COLOR_TEXT = (240, 240, 255)
+# Entity tracking databases
+p_bullets = []  # Elements format: [x, y]
+b_bullets = []  # Elements format: [x, y, dx]
+enemies = [[random.randint(0, 760), random.randint(-200, -50), random.uniform(2, 4), 0.0] for _ in range(5)]
+powerups = []   # Elements format: [x, y, type]
+particles = []  # Elements format: [x, y, dx, dy, alpha]
+boss = None     # Structure format: [x, y, dir, health, max_health, attack_tick]
 
-# --- Particles ---
-class Particle(pygame.sprite.Sprite):
-    def __init__(self, x, y, color):
-        super().__init__()
-        self.image = pygame.Surface((4, 4), pygame.SRCALPHA)
-        self.color = color
-        self.rect = self.image.get_rect(center=(x, y))
-        self.angle = random.uniform(0, math.pi * 2)
-        self.speed = random.uniform(2, 6)
-        self.alpha = 255
-        self.decay = random.uniform(6, 12)
+# --- Main Performance Loop ---
+while True:
+    for e in pygame.event.get():
+        if e.type == pygame.QUIT: pygame.quit(); sys.exit()
+        if e.type == pygame.KEYDOWN and p_health <= 0:  # Soft memory wipe engine reset
+            px, py, p_health, score, tier, boss = 375, 540, 100, 0, 1, None
+            p_bullets, b_bullets, powerups, particles = [], [], [], []
+            enemies = [[random.randint(0, 760), random.randint(-200, -50), random.uniform(2, 4), 0.0] for _ in range(5)]
 
-    def update(self):
-        self.rect.x += math.cos(self.angle) * self.speed
-        self.rect.y += math.sin(self.angle) * self.speed
-        self.alpha -= self.decay
-        if self.alpha <= 0:
-            self.kill()
-        else:
-            self.image.fill((0, 0, 0, 0))
-            pygame.draw.circle(self.image, (*self.color, int(self.alpha)), (2, 2), 2)
+    if p_health > 0:
+        # Timers state tickdowns
+        if fire_cooldown > 0: fire_cooldown -= 1
+        if shield_timer > 0:  shield_timer -= 1
+        if rapid_timer > 0:   rapid_timer -= 1
 
-# --- Drops / Power-ups ---
-class PowerUp(pygame.sprite.Sprite):
-    def __init__(self, x, y, type):
-        super().__init__()
-        self.type = type # "SHIELD" or "RAPID"
-        self.image = pygame.Surface((24, 24), pygame.SRCALPHA)
-        self.rect = self.image.get_rect(center=(x, y))
-        self.speed_y = 3
-        
-        if self.type == "SHIELD":
-            pygame.draw.circle(self.image, COLOR_SHIELD, (12, 12), 10, 2)
-            pygame.draw.circle(self.image, COLOR_SHIELD, (12, 12), 5)
-        elif self.type == "RAPID":
-            # Drawing a lightning bolt shape
-            pygame.draw.polygon(self.image, (255, 255, 0), [(14, 2), (6, 12), (12, 12), (10, 22), (18, 12), (12, 12)])
-
-    def update(self):
-        self.rect.y += self.speed_y
-        if self.rect.top > HEIGHT:
-            self.kill()
-
-# --- Player ---
-class Player(pygame.sprite.Sprite):
-    def __init__(self):
-        super().__init__()
-        self.image = pygame.Surface((50, 40), pygame.SRCALPHA)
-        pygame.draw.polygon(self.image, COLOR_PLAYER, [(25, 0), (0, 40), (25, 30), (50, 40)])
-        self.rect = self.image.get_rect(centerx=WIDTH // 2, bottom=HEIGHT - 30)
-        self.speed = 7
-        self.max_health = 100
-        self.health = self.max_health
-        self.fire_cooldown = 0
-        
-        # Power-up states
-        self.shield_timer = 0
-        self.rapid_timer = 0
-
-    def update(self):
-        # Timers
-        if self.fire_cooldown > 0: self.fire_cooldown -= 1
-        if self.shield_timer > 0:  self.shield_timer -= 1
-        if self.rapid_timer > 0:   self.rapid_timer -= 1
-            
-        # Visual styling changes if shielded
-        self.image.fill((0, 0, 0, 0))
-        if self.shield_timer > 0:
-            pygame.draw.polygon(self.image, COLOR_SHIELD, [(25, 0), (0, 40), (25, 30), (50, 40)])
-            pygame.draw.circle(self.image, COLOR_SHIELD, (25, 22), 24, 2)
-        else:
-            pygame.draw.polygon(self.image, COLOR_PLAYER, [(25, 0), (0, 40), (25, 30), (50, 40)])
-
-        # Left / Right Movement Only (Vertical logic completely removed)
+        # Celeron-friendly optimized keyboard polling logic
         keys = pygame.key.get_pressed()
-        if keys[pygame.K_LEFT] or keys[pygame.K_a]:
-            self.rect.x -= self.speed
-        if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
-            self.rect.x += self.speed
+        if keys[pygame.K_LEFT] or keys[pygame.K_a]:  px = max(0, px - 7)
+        if keys[pygame.K_RIGHT] or keys[pygame.K_d]: px = min(W - pw, px + 7)
+        if keys[pygame.K_SPACE] and fire_cooldown == 0:
+            fire_cooldown = 5 if rapid_timer > 0 else 15
+            p_bullets.extend([[px + 5, py], [px + pw - 10, py]])
+
+        # 1. Update Player Projectiles Physics
+        for b in p_bullets[:]:
+            b[1] -= 12
+            if b[1] < 0: p_bullets.remove(b)
+
+        # 2. Update Standard Enemy Arrays & Collisions
+        for en in enemies:
+            en[1] += en[2]                       # Vertical gravity drop speed
+            en[3] += 0.05                        # Low overhead wobble calculation
+            en[0] += int(1.5 * (1 if en[3] % 2 > 1 else -1)) # Integer step variation instead of sin()
+            if en[1] > H: en[0], en[1] = random.randint(0, 760), random.randint(-150, -40)
+
+            # Hitbox resolution checks against player lasers
+            ebx = pygame.Rect(en[0], en[1], 32, 32)
+            for pb in p_bullets[:]:
+                if ebx.collidepoint(pb[0], pb[1]):
+                    if pb in p_bullets: p_bullets.remove(pb)
+                    score += 50
+                    particles.extend([[en[0]+16, en[1]+16, random.randint(-3, 3), random.randint(-3, 3), 255] for _ in range(6)])
+                    if random.random() < 0.2: powerups.append([en[0], en[1], "SHIELD" if random.random() < 0.5 else "RAPID"])
+                    en[0], en[1] = random.randint(0, 760), random.randint(-150, -40)
+
+            # Enemy hull contact checking
+            if shield_timer <= 0 and ebx.colliderect(pygame.Rect(px, py, pw, ph)):
+                p_health -= 20
+                en[0], en[1] = random.randint(0, 760), random.randint(-150, -40)
+
+        # 3. Micro Boss AI Processing Structure
+        if boss is None and score >= tier * 1000 and tier <= 5:
+            boss = [350, 60, 2 + tier * 0.5, 200 * tier, 200 * tier, 0] # x, y, speed, hp, max_hp, tick
         
-        self.rect.x = max(0, min(WIDTH - self.rect.width, self.rect.x))
+        if boss:
+            boss[0] += boss[2]
+            if boss[0] <= 0 or boss[0] >= W - (100 + tier * 15): boss[2] *= -1 # Reverse direction on boundaries
+            boss[5] += 1
 
-        # Firing weapon mechanics
-        if keys[pygame.K_SPACE] and self.fire_cooldown == 0:
-            self.shoot()
+            # Flat conditional firing table cuts down looping calls
+            if boss[5] % (45 - tier * 4) == 0:
+                if tier == 1: b_bullets.extend([[boss[0]+50, boss[1]+40, dx] for dx in [-2, 0, 2]])
+                elif tier == 2: b_bullets.extend([[boss[0]+20, boss[1]+40, 0], [boss[0]+70, boss[1]+40, 0]])
+                elif tier >= 3: b_bullets.extend([[boss[0]+50, boss[1]+40, dx] for dx in [-4, -2, 0, 2, 4]])
 
-    def shoot(self):
-        # Cooldown is 4 frames if rapid fire is active, otherwise 14 frames
-        self.fire_cooldown = 4 if self.rapid_timer > 0 else 14
-        b1 = Bullet(self.rect.left + 5, self.rect.top + 10, -12, COLOR_BULLET_P)
-        b2 = Bullet(self.rect.right - 5, self.rect.top + 10, -12, COLOR_BULLET_P)
-        all_sprites.add(b1, b2)
-        player_bullets.add(b1, b2)
+            # Checking player laser payloads hitting the boss core
+            brx = pygame.Rect(boss[0], boss[1], 100 + tier * 15, 50)
+            for pb in p_bullets[:]:
+                if brx.collidepoint(pb[0], pb[1]):
+                    if pb in p_bullets: p_bullets.remove(pb)
+                    boss[3] -= 10
+                    if boss[3] <= 0:
+                        score += 500; tier += 1; boss = None; break
 
-# --- Normal Enemies ---
-class Enemy(pygame.sprite.Sprite):
-    def __init__(self):
-        super().__init__()
-        self.image = pygame.Surface((32, 32), pygame.SRCALPHA)
-        pygame.draw.polygon(self.image, COLOR_ENEMY, [(16, 0), (32, 16), (16, 32), (0, 16)])
-        self.rect = self.image.get_rect(x=random.randrange(WIDTH - 32), y=random.randrange(-150, -40))
-        self.speed_y = random.uniform(2, 4)
-        self.wobble = random.uniform(0, 100)
+        # 4. Global Hostile Fire Mechanics
+        for bb in b_bullets[:]:
+            bb[1] += 6; bb[0] += bb[2]
+            if bb[1] > H or bb[0] < 0 or bb[0] > W: b_bullets.remove(bb); continue
+            if shield_timer <= 0 and pygame.Rect(px, py, pw, ph).collidepoint(bb[0], bb[1]):
+                p_health -= 15; b_bullets.remove(bb)
 
-    def update(self):
-        self.rect.y += self.speed_y
-        self.wobble += 0.05
-        self.rect.x += math.sin(self.wobble) * 2
-        if self.rect.top > HEIGHT:
-            self.reset_position()
+        # 5. Drop Loot Updates
+        for po in powerups[:]:
+            po[1] += 3
+            if po[1] > H: powerups.remove(po); continue
+            if pygame.Rect(px, py, pw, ph).colliderect(pygame.Rect(po[0], po[1], 20, 20)):
+                if po[2] == "SHIELD": shield_timer = 300
+                else: rapid_timer = 300
+                powerups.remove(po)
 
-    def reset_position(self):
-        self.rect.x = random.randrange(WIDTH - self.rect.width)
-        self.rect.y = random.randrange(-150, -40)
-        self.speed_y = random.uniform(2, 4)
+        # 6. Light Particles Physics Updates
+        for pt in particles[:]:
+            pt[0] += pt[2]; pt[1] += pt[3]; pt[4] -= 8
+            if pt[4] <= 0: particles.remove(pt)
 
-class Bullet(pygame.sprite.Sprite):
-    def __init__(self, x, y, speed_y, color, speed_x=0):
-        super().__init__()
-        self.image = pygame.Surface((6, 16), pygame.SRCALPHA)
-        pygame.draw.rect(self.image, color, (0, 0, 6, 16), border_radius=3)
-        self.rect = self.image.get_rect(center=(x, y))
-        self.speed_y = speed_y
-        self.speed_x = speed_x
+    # --- Screen Draw Pipeline ---
+    screen.fill((10, 8, 22))
 
-    def update(self):
-        self.rect.y += self.speed_y
-        self.rect.x += self.speed_x
-        if self.rect.bottom < 0 or self.rect.top > HEIGHT or self.rect.right < 0 or self.rect.left > WIDTH:
-            self.kill()
+    # Drawing light primitives saves CPU draw overhead over heavy images
+    for pt in particles: pygame.draw.circle(screen, (255, 100, 100), (pt[0], pt[1]), 2)
+    for pb in p_bullets: pygame.draw.rect(screen, (0, 255, 255), (pb[0], pb[1], 4, 12))
+    for bb in b_bullets: pygame.draw.rect(screen, (255, 130, 0), (bb[0], bb[1], 5, 12))
+    for po in powerups: pygame.draw.circle(screen, (255, 255, 0) if po[2] == "RAPID" else (0, 190, 255), (po[0]+10, po[1]+10), 8)
+    for en in enemies: pygame.draw.polygon(screen, (255, 60, 60), [(en[0]+16, en[1]), (en[0]+32, en[1]+24), (en[0], en[1]+24)])
 
-# --- Progressive 5-Tier Boss System ---
-class Boss(pygame.sprite.Sprite):
-    def __init__(self, tier):
-        super().__init__()
-        self.tier = tier
-        
-        # Scale sizes and health formulas dynamically based on Tier
-        width = 100 + (tier * 20)
-        height = 60 + (tier * 12)
-        self.image = pygame.Surface((width, height), pygame.SRCALPHA)
-        
-        # Color spectrum shifting darker/more menacing per tier
-        self.color = (min(50 * tier, 255), 255 - (45 * tier), 255 if tier == 1 else 30)
-        pygame.draw.rect(self.image, self.color, (0, 0, width, height // 2), border_radius=10)
-        pygame.draw.polygon(self.image, self.color, [(0, height // 2), (width, height // 2), (width // 2, height)])
+    if boss:
+        bw = 100 + tier * 15
+        pygame.draw.rect(screen, (200, 30, 100), (boss[0], boss[1], bw, 30), border_radius=5)
+        pygame.draw.rect(screen, (80, 0, 0), (boss[0], boss[1] - 12, bw, 6))
+        pygame.draw.rect(screen, (255, 0, 0), (boss[0], boss[1] - 12, int(bw * (boss[3] / boss[4])), 6))
 
-        self.max_health = 200 * tier
-        self.health = self.max_health
-        self.speed = 2 + tier * 0.7
-        self.rect = self.image.get_rect(centerx=WIDTH // 2, y=50)
-        self.direction = 1
-        self.attack_timer = 0
+    if p_health > 0:
+        pygame.draw.polygon(screen, (0, 190, 255) if shield_timer > 0 else (0, 255, 150), [(px+25, py), (px, py+ph), (px+pw, py+ph)])
+        if shield_timer > 0: pygame.draw.circle(screen, (0, 190, 255), (px+25, py+20), 30, 1)
+    else:
+        t_txt = font.render("GAME OVER - Press Any Key to Restart", True, (255, 60, 60))
+        screen.blit(t_txt, (W//2 - t_txt.get_width()//2, H//2))
 
-    def update(self):
-        self.rect.x += self.speed * self.direction
-        if self.rect.right >= WIDTH or self.rect.left <= 0:
-            self.direction *= -1
+    # Core Diagnostic Display metrics
+    screen.blit(font.render(f"SCORE: {score}  |  TIER: {tier if tier <= 5 else 'MAX'}", True, (240, 240, 255)), (15, 15))
+    pygame.draw.rect(screen, (40, 40, 50), (15, 45, 100, 10))
+    pygame.draw.rect(screen, (0, 255, 150), (15, 45, max(0, p_health), 10))
 
-        self.attack_timer += 1
-        self.fire_patterns()
-
-    def fire_patterns(self):
-        # Boss 1: Slow Triple Stream
-        if self.tier == 1 and self.attack_timer % 45 == 0:
-            for dx in [-2, 0, 2]:
-                all_sprites.add(Bullet(self.rect.centerx, self.rect.bottom, 5, COLOR_BULLET_B, dx))
-                boss_bullets.add(Bullet(self.rect.centerx, self.rect.bottom, 5, COLOR_BULLET_B, dx))
-
-        # Boss 2: Double Spread + Faster
-        elif self.tier == 2 and self.attack_timer % 40 == 0:
-            for offset in [-30, 30]:
-                all_sprites.add(Bullet(self.rect.centerx + offset, self.rect.bottom, 6, COLOR_BULLET_B, 0))
-                boss_bullets.add(Bullet(self.rect.centerx + offset, self.rect.bottom, 6, COLOR_BULLET_B, 0))
-
-        # Boss 3: Radial 5-Shot Fan
-        elif self.tier == 3 and self.attack_timer % 35 == 0:
-            for dx in [-4, -2, 0, 2, 4]:
-                all_sprites.add(Bullet(self.rect.centerx, self.rect.bottom, 6, COLOR_BULLET_B, dx))
-                boss_bullets.add(Bullet(self.rect.centerx, self.rect.bottom, 6, COLOR_BULLET_B, dx))
-
-        # Boss 4: Targeted Aiming Vectors
-        elif self.tier == 4 and self.attack_timer % 30 == 0:
-            tx = player.rect.centerx - self.rect.centerx
-            ty = player.rect.centery - self.rect.bottom
-            dist = math.hypot(tx, ty) or 1
-            all_sprites.add(Bullet(self.rect.centerx, self.rect.bottom, (ty/dist)*7, (255, 0, 0), (tx/dist)*7))
-            boss_bullets.add(Bullet(self.rect.centerx, self.rect.bottom, (ty/dist)*7, (255, 0, 0), (tx/dist)*7))
-
-        # Boss 5 (FINAL): Rapid Rain Hellfire
-        elif self.tier == 5 and self.attack_timer % 12 == 0:
-            rx = random.uniform(-5, 5)
-            all_sprites.add(Bullet(random.randint(self.rect.left, self.rect.right), self.rect.bottom, 8, (255, 255, 0), rx))
-            boss_bullets.add(Bullet(random.randint(self.rect.left, self.rect.right), self.rect.bottom, 8, (255, 255, 0), rx))
-
-# --- Spawning Helpers ---
-def create_explosion(x, y, color=COLOR_ENEMY, count=12):
-    for _ in range(count):
-        all_sprites.add(Particle(x, y, color))
-
-def spawn_enemies(count):
-    for _ in range(count):
-        e = Enemy()
-        all_sprites.add(e)
-        enemies.add(e)
-
-# --- Setup Sprite Engine Containers ---
-all_sprites = pygame.sprite.Group()
-enemies = pygame.sprite.Group()
-player_bullets = pygame.sprite.Group()
-boss_bullets = pygame.sprite.Group()
-bosses = pygame.sprite.Group()
-powerups = pygame.sprite.Group()
-
-player = Player()
-all_sprites.add(player)
-spawn_enemies(6)
-
-# --- Mechanics System Trackers ---
-score = 0
-red_kills = 0
-boss_tier = 0
-active_boss = None
-game_state = "PLAYING"
-
-# --- Main Runtime Loop ---
-running = True
-while running:
-    clock.tick(FPS)
-    screen.fill(COLOR_BG)
-
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-        elif event.type == pygame.KEYDOWN and game_state != "PLAYING":
-            if event.key == pygame.K_r: # Full software state reconstruction
+    pygame.display.flip()
+    clock.tick(60)
