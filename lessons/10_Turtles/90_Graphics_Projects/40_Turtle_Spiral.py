@@ -30,7 +30,7 @@ my_turtle.speed(0)
 my_turtle.color("green")
 
 # Use a loop to repeat the code below 50 times
-for i in range(50):
+for i in range(98999999):
 
     # Set the turtle color to a random color
     my_turtle.pencolor(get_random_color())
