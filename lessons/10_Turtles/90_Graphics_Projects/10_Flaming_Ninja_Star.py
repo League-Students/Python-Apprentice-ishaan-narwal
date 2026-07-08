@@ -1,129 +1,121 @@
 import pygame
 import sys
-import random
 
 # Initialize Pygame
 pygame.init()
 
-# Game Display Options
+# Game Settings
 SCREEN_WIDTH = 900
 SCREEN_HEIGHT = 500
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption("Geometry Dash: POLTERGEIST (Wave Mode)")
+pygame.display.set_caption("Geometry Dash: POLARGEIST")
 clock = pygame.time.Clock()
 
-# Nine Circles Color Palette
-BLACK = (10, 10, 10)
-WHITE = (255, 255, 255)
-WAVE_COLOR = (0, 255, 255)     # Cyan wave icon
+# Colors (Polargeist's classic purple/blue vibes)
+BG_COLOR = (40, 15, 70)       # Dark purple atmosphere
+GROUND_COLOR = (20, 5, 40)    # Deep dark ground block
+CUBE_COLOR = (0, 255, 180)    # Cyan/mint player cube
+SPIKE_COLOR = (200, 20, 100)  # Bright magenta spikes
+ORB_COLOR = (255, 200, 0)     # Golden jump rings
 
-# Define the tight, chaotic Poltergeist map structure
-# Formatting: (X_position, Top_Wall_Height, Bottom_Wall_Y_Position)
-# Gives that iconic "extremely narrow tunnel" experience
-level_obstacles = [
-    (200, 150, 350), (300, 180, 330), (400, 120, 360),
-    (500, 200, 310), (600, 140, 340), (700, 220, 300),
-    (800, 160, 350), (900, 110, 370), (1000, 190, 320),
-    (1100, 230, 290), (1200, 130, 360), (1300, 170, 340),
-    (1400, 210, 310), (1500, 150, 350), (1600, 100, 390)
-]
-
-# Game Variables
+# Physics Config
+GRAVITY = 0.9
+JUMP_FORCE = -14
+game_speed = 6
 camera_x = 0
-game_speed = 5
 
-# Wave Player Setup (X starts fixed, Y controls physics)
-player_x = 100
-player_y = 250
-wave_speed_y = 5
-trail_points = []
+# Player Definition
+player_rect = pygame.Rect(150, 350, 40, 40)
+player_vel_y = 0
+is_grounded = False
+
+# LEVEL DESIGN (Polargeist Intro Layout)
+# Format: X coordinate position
+spikes = [350, 550, 750, 1100, 1140, 1500] 
+
+# Yellow Jump Rings (Orbs) Format: (X, Y)
+# These allow mid-air jumps if you click right as you pass through them!
+orbs = [(650, 280), (1300, 260)]
 
 # Main Game Loop
 running = True
-flash_counter = 0
-
 while running:
-    # 1. Handle Closing Window
+    # 1. Input Processing
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-
-    # 2. Controls: Hold SPACE to fly up, Release to dive down
+            
     keys = pygame.key.get_pressed()
-    if keys[pygame.K_SPACE]:
-        player_y -= wave_speed_y  # Move diagonally up
-    else:
-        player_y += wave_speed_y  # Move diagonally down
+    jump_intent = keys[pygame.K_SPACE] or keys[pygame.K_UP]
 
-    # Camera moves horizontally through the map automatically
+    # 2. Physics & Gravity Handling
+    player_vel_y += GRAVITY
+    player_rect.y += player_vel_y
+
+    # Ground Level Stop (Standard GD Floor line)
+    if player_rect.bottom >= 400:
+        player_rect.bottom = 400
+        player_vel_y = 0
+        is_grounded = True
+
+    # Regular Ground Jump
+    if jump_intent and is_grounded:
+        player_vel_y = JUMP_FORCE
+        is_grounded = False
+
+    # Move the level forward horizontally automatically
     camera_x += game_speed
-    current_player_global_x = player_x + camera_x
 
-    # Keep track of the wave's path to draw the iconic neon trail
-    trail_points.append((player_x, player_y))
-    if len(trail_points) > 40:
-        trail_points.pop(0)
-
-    # 3. Handle the Flashing Nine Circles Background Effect
-    flash_counter += 1
-    if flash_counter % 6 < 3:
-        # Alternates dark red styles rapidly to look like the real game
-        bg_color = (60, 0, 0) if (flash_counter // 6) % 2 == 0 else (20, 0, 0)
-        obstacle_color = (255, 40, 40)
-    else:
-        bg_color = BLACK
-        obstacle_color = (150, 0, 0)
-
-    # Draw Background
-    screen.fill(bg_color)
-
-    # 4. Render Obstacles and Test for Collisions
-    player_rect = pygame.Rect(player_x, player_y, 16, 16)
+    # 3. Game Element Rendering & Collisions
+    screen.fill(BG_COLOR)
     
-    # Floor and Ceiling boundaries
-    if player_y < 0 or player_y > SCREEN_HEIGHT - 16:
-        print("💥 CRASHED! Poltergeist demands perfect precision!")
-        running = False
+    # Draw the main landscape floor line
+    pygame.draw.rect(screen, GROUND_COLOR, (0, 400, SCREEN_WIDTH, 100))
 
-    for obs_x, top_height, bot_y in level_obstacles:
-        # Map global level positions to matching screen positions
-        screen_x = obs_x - camera_x
+    # Handle Jump Orbs
+    for orb_x, orb_y in orbs:
+        screen_orb_x = orb_x - camera_x
+        # Only render if visible on the player's view
+        if -50 < screen_orb_x < SCREEN_WIDTH + 50:
+            orb_rect = pygame.Rect(screen_orb_x, orb_y, 30, 30)
+            pygame.draw.circle(screen, ORB_COLOR, (screen_orb_x + 15, orb_y + 15), 15)
+            
+            # Interactive Ring mechanic: Touch orb + Press spacebar = Mid-air boost!
+            if player_rect.colliderect(orb_rect) and jump_intent:
+                player_vel_y = JUMP_FORCE
+                is_grounded = False
 
-        # Only process objects currently visible on screen
-        if -100 < screen_x < SCREEN_WIDTH + 100:
-            top_block = pygame.Rect(screen_x, 0, 60, top_height)
-            bot_block = pygame.Rect(screen_x, bot_y, 60, SCREEN_HEIGHT - bot_y)
+    # Handle Spikes
+    for spike_x in spikes:
+        screen_spike_x = spike_x - camera_x
+        if -50 < screen_spike_x < SCREEN_WIDTH + 50:
+            # Build the custom triangle path for precise spikes
+            spike_points = [
+                (screen_spike_x, 400),
+                (screen_spike_x + 20, 350),
+                (screen_spike_x + 40, 400)
+            ]
+            pygame.draw.polygon(screen, SPIKE_COLOR, spike_points)
 
-            # Draw the glowing grid hazards
-            pygame.draw.rect(screen, obstacle_color, top_block)
-            pygame.draw.rect(screen, obstacle_color, bot_block)
-            pygame.draw.rect(screen, WHITE, top_block, 1) # White outline grid
-            pygame.draw.rect(screen, WHITE, bot_block, 1)
-
-            # Accurate hitbox verification
-            if player_rect.colliderect(top_block) or player_rect.colliderect(bot_block):
-                print("💥 Exploded into icons! Try again to master the spacing!")
+            # Hitbox check: Crash and burn on impact
+            spike_hitbox = pygame.Rect(screen_spike_x + 8, 360, 24, 40)
+            if player_rect.colliderect(spike_hitbox):
+                print("💥 Crash! Practice your timings to beat Polargeist!")
                 running = False
 
-    # 5. Draw the Wave Trail and Player Icon
-    if len(trail_points) > 1:
-        pygame.draw.lines(screen, WAVE_COLOR, False, trail_points, 3)
-    
-    # Draw the main triangle wave projectile
-    pygame.draw.polygon(screen, WHITE, [
-        (player_x + 16, player_y + 8), 
-        (player_x, player_y), 
-        (player_x, player_y + 16)
-    ])
+    # Draw Player Avatar Square
+    pygame.draw.rect(screen, CUBE_COLOR, player_rect)
+    pygame.draw.rect(screen, (255, 255, 255), player_rect, 3) # Sleek border outline
 
-    # End Level Win Trigger
-    if camera_x > 1650:
-        print("🎉 VICTORY! You survived Poltergeist!")
+    # Win Flag Trigger
+    if camera_x > 1700:
+        print("🎉 Level Complete! You mastered the rhythms of Polargeist!")
         running = False
 
-    # Display loop adjustments
+    # Update Frame
     pygame.display.flip()
-    clock.tick(60) # Smooth 60hz simulation framerate
+    clock.tick(60)
 
 pygame.quit()
 sys.exit()
+
