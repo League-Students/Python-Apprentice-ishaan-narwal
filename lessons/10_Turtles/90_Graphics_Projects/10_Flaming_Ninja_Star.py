@@ -2,304 +2,259 @@ import pygame
 import random
 import math
 
-# Initialize Pygame
+# --- Initialization ---
 pygame.init()
-
-# Screen Dimensions
-WIDTH = 800
-HEIGHT = 600
+WIDTH, HEIGHT = 800, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Galactic Defender")
-
-# Frame Rate
+pygame.display.set_caption("Galactic Defender: Striker Edition")
 clock = pygame.time.Clock()
 FPS = 60
 
-# Colors
-WHITE = (255, 255, 255)
-RED = (255, 0, 0)
-GREEN = (0, 255, 0)
-BLUE = (0, 0, 255)
-YELLOW = (255, 255, 0)
-BLACK = (0, 0, 0)
+# --- Colors & Fonts ---
+FONT_MAIN = pygame.font.SysFont("Arial", 22, bold=True)
+FONT_TITLE = pygame.font.SysFont("Arial", 48, bold=True)
 
-# Fonts
-font = pygame.font.SysFont(None, 36)
-game_over_font = pygame.font.SysFont(None, 74)
+COLOR_BG = (10, 8, 22)
+COLOR_PLAYER = (0, 255, 150)
+COLOR_SHIELD = (0, 190, 255)
+COLOR_ENEMY = (255, 60, 60)
+COLOR_BULLET_P = (0, 255, 255)
+COLOR_BULLET_B = (255, 130, 0)
+COLOR_TEXT = (240, 240, 255)
 
-# Score
-score = 0
+# --- Particles ---
+class Particle(pygame.sprite.Sprite):
+    def __init__(self, x, y, color):
+        super().__init__()
+        self.image = pygame.Surface((4, 4), pygame.SRCALPHA)
+        self.color = color
+        self.rect = self.image.get_rect(center=(x, y))
+        self.angle = random.uniform(0, math.pi * 2)
+        self.speed = random.uniform(2, 6)
+        self.alpha = 255
+        self.decay = random.uniform(6, 12)
 
-# --- Player Class ---
+    def update(self):
+        self.rect.x += math.cos(self.angle) * self.speed
+        self.rect.y += math.sin(self.angle) * self.speed
+        self.alpha -= self.decay
+        if self.alpha <= 0:
+            self.kill()
+        else:
+            self.image.fill((0, 0, 0, 0))
+            pygame.draw.circle(self.image, (*self.color, int(self.alpha)), (2, 2), 2)
+
+# --- Drops / Power-ups ---
+class PowerUp(pygame.sprite.Sprite):
+    def __init__(self, x, y, type):
+        super().__init__()
+        self.type = type # "SHIELD" or "RAPID"
+        self.image = pygame.Surface((24, 24), pygame.SRCALPHA)
+        self.rect = self.image.get_rect(center=(x, y))
+        self.speed_y = 3
+        
+        if self.type == "SHIELD":
+            pygame.draw.circle(self.image, COLOR_SHIELD, (12, 12), 10, 2)
+            pygame.draw.circle(self.image, COLOR_SHIELD, (12, 12), 5)
+        elif self.type == "RAPID":
+            # Drawing a lightning bolt shape
+            pygame.draw.polygon(self.image, (255, 255, 0), [(14, 2), (6, 12), (12, 12), (10, 22), (18, 12), (12, 12)])
+
+    def update(self):
+        self.rect.y += self.speed_y
+        if self.rect.top > HEIGHT:
+            self.kill()
+
+# --- Player ---
 class Player(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
-        self.image = pygame.Surface((50, 40))
-        self.image.fill(GREEN)
-        self.rect = self.image.get_rect()
-        self.rect.centerx = WIDTH // 2
-        self.rect.bottom = HEIGHT - 10
-        self.speed = 5
-        self.health = 100
+        self.image = pygame.Surface((50, 40), pygame.SRCALPHA)
+        pygame.draw.polygon(self.image, COLOR_PLAYER, [(25, 0), (0, 40), (25, 30), (50, 40)])
+        self.rect = self.image.get_rect(centerx=WIDTH // 2, bottom=HEIGHT - 30)
+        self.speed = 7
+        self.max_health = 100
+        self.health = self.max_health
+        self.fire_cooldown = 0
+        
+        # Power-up states
+        self.shield_timer = 0
+        self.rapid_timer = 0
 
     def update(self):
+        # Timers
+        if self.fire_cooldown > 0: self.fire_cooldown -= 1
+        if self.shield_timer > 0:  self.shield_timer -= 1
+        if self.rapid_timer > 0:   self.rapid_timer -= 1
+            
+        # Visual styling changes if shielded
+        self.image.fill((0, 0, 0, 0))
+        if self.shield_timer > 0:
+            pygame.draw.polygon(self.image, COLOR_SHIELD, [(25, 0), (0, 40), (25, 30), (50, 40)])
+            pygame.draw.circle(self.image, COLOR_SHIELD, (25, 22), 24, 2)
+        else:
+            pygame.draw.polygon(self.image, COLOR_PLAYER, [(25, 0), (0, 40), (25, 30), (50, 40)])
+
+        # Left / Right Movement Only (Vertical logic completely removed)
         keys = pygame.key.get_pressed()
         if keys[pygame.K_LEFT] or keys[pygame.K_a]:
             self.rect.x -= self.speed
         if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
             self.rect.x += self.speed
-        if keys[pygame.K_UP] or keys[pygame.K_w]:
-            self.rect.y -= self.speed
-        if keys[pygame.K_DOWN] or keys[pygame.K_s]:
-            self.rect.y += self.speed
+        
+        self.rect.x = max(0, min(WIDTH - self.rect.width, self.rect.x))
 
-        # Boundary checks
-        if self.rect.left < 0: self.rect.left = 0
-        if self.rect.right > WIDTH: self.rect.right = WIDTH
-        if self.rect.top < 0: self.rect.top = 0
-        if self.rect.bottom > HEIGHT: self.rect.bottom = HEIGHT
+        # Firing weapon mechanics
+        if keys[pygame.K_SPACE] and self.fire_cooldown == 0:
+            self.shoot()
 
     def shoot(self):
-        bullet = Bullet(self.rect.centerx, self.rect.top)
-        all_sprites.add(bullet)
-        bullets.add(bullet)
+        # Cooldown is 4 frames if rapid fire is active, otherwise 14 frames
+        self.fire_cooldown = 4 if self.rapid_timer > 0 else 14
+        b1 = Bullet(self.rect.left + 5, self.rect.top + 10, -12, COLOR_BULLET_P)
+        b2 = Bullet(self.rect.right - 5, self.rect.top + 10, -12, COLOR_BULLET_P)
+        all_sprites.add(b1, b2)
+        player_bullets.add(b1, b2)
 
-# --- Bullet Class ---
-class Bullet(pygame.sprite.Sprite):
-    def __init__(self, x, y):
-        super().__init__()
-        self.image = pygame.Surface((10, 20))
-        self.image.fill(WHITE)
-        self.rect = self.image.get_rect()
-        self.rect.bottom = y
-        self.rect.centerx = x
-        self.speed = -10
-
-    def update(self):
-        self.rect.y += self.speed
-        # Kill if it moves off-screen
-        if self.rect.bottom < 0:
-            self.kill()
-
-# --- Enemy Class ---
+# --- Normal Enemies ---
 class Enemy(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
-        self.image = pygame.Surface((30, 30))
-        self.image.fill(RED)
-        self.rect = self.image.get_rect()
-        self.rect.x = random.randrange(WIDTH - self.rect.width)
-        self.rect.y = random.randrange(-100, -40)
-        self.speedy = random.randrange(1, 4)
-        self.speedx = random.randrange(-2, 2)
+        self.image = pygame.Surface((32, 32), pygame.SRCALPHA)
+        pygame.draw.polygon(self.image, COLOR_ENEMY, [(16, 0), (32, 16), (16, 32), (0, 16)])
+        self.rect = self.image.get_rect(x=random.randrange(WIDTH - 32), y=random.randrange(-150, -40))
+        self.speed_y = random.uniform(2, 4)
+        self.wobble = random.uniform(0, 100)
 
     def update(self):
-        self.rect.y += self.speedy
-        self.rect.x += self.speedx
-        
-        # Boundary bounce
-        if self.rect.right > WIDTH or self.rect.left < 0:
-            self.speedx = -self.speedx
-
+        self.rect.y += self.speed_y
+        self.wobble += 0.05
+        self.rect.x += math.sin(self.wobble) * 2
         if self.rect.top > HEIGHT:
-            self.rect.x = random.randrange(WIDTH - self.rect.width)
-            self.rect.y = random.randrange(-100, -40)
-            self.speedy = random.randrange(1, 4)
+            self.reset_position()
 
-# --- Boss Class ---
-class Boss(pygame.sprite.Sprite):
-    def __init__(self, level):
+    def reset_position(self):
+        self.rect.x = random.randrange(WIDTH - self.rect.width)
+        self.rect.y = random.randrange(-150, -40)
+        self.speed_y = random.uniform(2, 4)
+
+class Bullet(pygame.sprite.Sprite):
+    def __init__(self, x, y, speed_y, color, speed_x=0):
         super().__init__()
-        self.level = level
-        # Boss sizing and color based on level
-        if level == 1:
-            self.image = pygame.Surface((100, 80))
-            self.image.fill(BLUE)
-            self.health = 200
-            self.max_health = 200
-            self.speed = 2
-        elif level == 2:
-            self.image = pygame.Surface((120, 100))
-            self.image.fill(YELLOW)
-            self.health = 400
-            self.max_health = 400
-            self.speed = 3
-        elif level == 3:
-            self.image = pygame.Surface((160, 120))
-            self.image.fill((255, 0, 255)) # Purple
-            self.health = 600
-            self.max_health = 600
-            self.speed = 4
-
-        self.rect = self.image.get_rect()
-        self.rect.centerx = WIDTH // 2
-        self.rect.y = 50
-        self.direction = 1 # 1 for right, -1 for left
+        self.image = pygame.Surface((6, 16), pygame.SRCALPHA)
+        pygame.draw.rect(self.image, color, (0, 0, 6, 16), border_radius=3)
+        self.rect = self.image.get_rect(center=(x, y))
+        self.speed_y = speed_y
+        self.speed_x = speed_x
 
     def update(self):
-        # Move side to side
+        self.rect.y += self.speed_y
+        self.rect.x += self.speed_x
+        if self.rect.bottom < 0 or self.rect.top > HEIGHT or self.rect.right < 0 or self.rect.left > WIDTH:
+            self.kill()
+
+# --- Progressive 5-Tier Boss System ---
+class Boss(pygame.sprite.Sprite):
+    def __init__(self, tier):
+        super().__init__()
+        self.tier = tier
+        
+        # Scale sizes and health formulas dynamically based on Tier
+        width = 100 + (tier * 20)
+        height = 60 + (tier * 12)
+        self.image = pygame.Surface((width, height), pygame.SRCALPHA)
+        
+        # Color spectrum shifting darker/more menacing per tier
+        self.color = (min(50 * tier, 255), 255 - (45 * tier), 255 if tier == 1 else 30)
+        pygame.draw.rect(self.image, self.color, (0, 0, width, height // 2), border_radius=10)
+        pygame.draw.polygon(self.image, self.color, [(0, height // 2), (width, height // 2), (width // 2, height)])
+
+        self.max_health = 200 * tier
+        self.health = self.max_health
+        self.speed = 2 + tier * 0.7
+        self.rect = self.image.get_rect(centerx=WIDTH // 2, y=50)
+        self.direction = 1
+        self.attack_timer = 0
+
+    def update(self):
         self.rect.x += self.speed * self.direction
-        if self.rect.right > WIDTH:
-            self.direction = -1
-        elif self.rect.left < 0:
-            self.direction = 1
+        if self.rect.right >= WIDTH or self.rect.left <= 0:
+            self.direction *= -1
 
-    def take_damage(self, amount):
-        self.health -= amount
-        return self.health <= 0
+        self.attack_timer += 1
+        self.fire_patterns()
 
-# --- Helper Functions ---
-def draw_text(surface, text, font, color, x, y):
-    text_surface = font.render(text, True, color)
-    text_rect = text_surface.get_rect()
-    text_rect.midtop = (x, y)
-    surface.blit(text_surface, text_rect)
+    def fire_patterns(self):
+        # Boss 1: Slow Triple Stream
+        if self.tier == 1 and self.attack_timer % 45 == 0:
+            for dx in [-2, 0, 2]:
+                all_sprites.add(Bullet(self.rect.centerx, self.rect.bottom, 5, COLOR_BULLET_B, dx))
+                boss_bullets.add(Bullet(self.rect.centerx, self.rect.bottom, 5, COLOR_BULLET_B, dx))
 
-def draw_health_bar(surface, x, y, current, maximum, color):
-    if current < 0: current = 0
-    bar_length = 200
-    bar_height = 20
-    fill = (current / maximum) * bar_length
-    outline_rect = pygame.Rect(x, y, bar_length, bar_height)
-    fill_rect = pygame.Rect(x, y, fill, bar_height)
-    pygame.draw.rect(surface, color, fill_rect)
-    pygame.draw.rect(surface, WHITE, outline_rect, 2)
+        # Boss 2: Double Spread + Faster
+        elif self.tier == 2 and self.attack_timer % 40 == 0:
+            for offset in [-30, 30]:
+                all_sprites.add(Bullet(self.rect.centerx + offset, self.rect.bottom, 6, COLOR_BULLET_B, 0))
+                boss_bullets.add(Bullet(self.rect.centerx + offset, self.rect.bottom, 6, COLOR_BULLET_B, 0))
 
-# --- Sprite Groups ---
+        # Boss 3: Radial 5-Shot Fan
+        elif self.tier == 3 and self.attack_timer % 35 == 0:
+            for dx in [-4, -2, 0, 2, 4]:
+                all_sprites.add(Bullet(self.rect.centerx, self.rect.bottom, 6, COLOR_BULLET_B, dx))
+                boss_bullets.add(Bullet(self.rect.centerx, self.rect.bottom, 6, COLOR_BULLET_B, dx))
+
+        # Boss 4: Targeted Aiming Vectors
+        elif self.tier == 4 and self.attack_timer % 30 == 0:
+            tx = player.rect.centerx - self.rect.centerx
+            ty = player.rect.centery - self.rect.bottom
+            dist = math.hypot(tx, ty) or 1
+            all_sprites.add(Bullet(self.rect.centerx, self.rect.bottom, (ty/dist)*7, (255, 0, 0), (tx/dist)*7))
+            boss_bullets.add(Bullet(self.rect.centerx, self.rect.bottom, (ty/dist)*7, (255, 0, 0), (tx/dist)*7))
+
+        # Boss 5 (FINAL): Rapid Rain Hellfire
+        elif self.tier == 5 and self.attack_timer % 12 == 0:
+            rx = random.uniform(-5, 5)
+            all_sprites.add(Bullet(random.randint(self.rect.left, self.rect.right), self.rect.bottom, 8, (255, 255, 0), rx))
+            boss_bullets.add(Bullet(random.randint(self.rect.left, self.rect.right), self.rect.bottom, 8, (255, 255, 0), rx))
+
+# --- Spawning Helpers ---
+def create_explosion(x, y, color=COLOR_ENEMY, count=12):
+    for _ in range(count):
+        all_sprites.add(Particle(x, y, color))
+
+def spawn_enemies(count):
+    for _ in range(count):
+        e = Enemy()
+        all_sprites.add(e)
+        enemies.add(e)
+
+# --- Setup Sprite Engine Containers ---
 all_sprites = pygame.sprite.Group()
 enemies = pygame.sprite.Group()
-bullets = pygame.sprite.Group()
+player_bullets = pygame.sprite.Group()
+boss_bullets = pygame.sprite.Group()
 bosses = pygame.sprite.Group()
+powerups = pygame.sprite.Group()
 
 player = Player()
 all_sprites.add(player)
+spawn_enemies(6)
 
-# Spawn initial enemies
-for i in range(8):
-    enemy = Enemy()
-    all_sprites.add(enemy)
-    enemies.add(enemy)
+# --- Mechanics System Trackers ---
+score = 0
+red_kills = 0
+boss_tier = 0
+active_boss = None
+game_state = "PLAYING"
 
-# Game Loop Variables
-game_over = False
-victory = False
-boss_fight = False
-current_boss_level = 0
-score_to_boss = 300 # Score needed to trigger boss 
-
-# --- Game Loop ---
+# --- Main Runtime Loop ---
 running = True
 while running:
-    # Keep loop running at the right speed
     clock.tick(FPS)
+    screen.fill(COLOR_BG)
 
-    # Process Input (Events)
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-        elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_SPACE:
-                if not game_over:
-                    player.shoot()
-            if event.key == pygame.K_r and game_over:
-                # Reset game
-                score = 0
-                player.health = 100
-                game_over = False
-                victory = False
-                boss_fight = False
-                current_boss_level = 0
-                
-                # Clear all sprites
-                for sprite in all_sprites:
-                    sprite.kill()
-                
-                all_sprites.add(player)
-                for i in range(8):
-                    enemy = Enemy()
-                    all_sprites.add(enemy)
-                    enemies.add(enemy)
-
-    if not game_over:
-        # Check if it's time for a boss
-        if score >= score_to_boss and not boss_fight and current_boss_level < 3:
-            # Clear normal enemies for boss fight
-            for enemy in enemies:
-                enemy.kill()
-            current_boss_level += 1
-            boss = Boss(current_boss_level)
-            all_sprites.add(boss)
-            bosses.add(boss)
-            boss_fight = True
-
-        # Update
-        all_sprites.update()
-
-        # Check for bullet hitting an enemy
-        hits = pygame.sprite.groupcollide(enemies, bullets, True, True)
-        for hit in hits:
-            score += 10
-            # Spawn a new enemy to replace the dead one
-            m = Enemy()
-            all_sprites.add(m)
-            enemies.add(m)
-
-        # Check for bullet hitting the boss
-        if boss_fight:
-            boss_hits = pygame.sprite.groupcollide(bosses, bullets, False, True)
-            for b in boss_hits:
-                defeated = b.take_damage(10)
-                if defeated:
-                    b.kill()
-                    boss_fight = False
-                    score += 500 # Big boss bonus
-                    
-                    if current_boss_level >= 3:
-                        victory = True
-                        game_over = True
-                    else:
-                        # Resume normal enemies
-                        for i in range(8):
-                            enemy = Enemy()
-                            all_sprites.add(enemy)
-                            enemies.add(enemy)
-
-        # Check for enemy hitting player
-        hits = pygame.sprite.spritecollide(player, enemies, True)
-        for hit in hits:
-            player.health -= 20
-            # Spawn new enemy
-            m = Enemy()
-            all_sprites.add(m)
-            enemies.add(m)
-
-        # Check if player died
-        if player.health <= 0:
-            game_over = True
-
-    # Draw / Render
-    screen.fill(BLACK)
-    all_sprites.draw(screen)
-
-    # Draw HUD
-    draw_text(screen, f"Score: {score}", font, WHITE, WIDTH // 2, 10)
-    draw_health_bar(screen, 10, 10, player.health, 100, GREEN)
-
-    if boss_fight:
-        # Assuming there is only one boss at a time in this group
-        for b in bosses:
-            draw_text(screen, f"BOSS Level {current_boss_level}", font, RED, WIDTH // 2, 40)
-            draw_health_bar(screen, WIDTH // 2 - 100, 70, b.health, b.max_health, RED)
-
-    if game_over:
-        if victory:
-            draw_text(screen, "VICTORY!", game_over_font, GREEN, WIDTH // 2, HEIGHT // 2 - 50)
-            draw_text(screen, "Press 'R' to restart", font, WHITE, WIDTH // 2, HEIGHT // 2 + 20)
-        else:
-            draw_text(screen, "GAME OVER", game_over_font, RED, WIDTH // 2, HEIGHT // 2 - 50)
-            draw_text(screen, "Press 'R' to restart", font, WHITE, WIDTH // 2, HEIGHT // 2 + 20)
-
-    # Flip the display
-    pygame.display.flip()
-
-pygame.quit()
+        elif event.type == pygame.KEYDOWN and game_state != "PLAYING":
+            if event.key == pygame.K_r: # Full software state reconstruction
