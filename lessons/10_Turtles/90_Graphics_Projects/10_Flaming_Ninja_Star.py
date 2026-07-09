@@ -2,7 +2,7 @@ import sys
 import random
 import pygame
 
-# --- Constants ---
+
 WIDTH, HEIGHT = 800, 600
 FPS = 60
 SCREEN_RECT = pygame.Rect(0, 0, WIDTH, HEIGHT)  # FIXED: Global reference to prevent NameError crashing
