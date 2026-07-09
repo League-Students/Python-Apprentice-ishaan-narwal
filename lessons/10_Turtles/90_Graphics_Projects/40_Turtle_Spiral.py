@@ -1,10 +1,11 @@
 import pygame
 import random
 import os
+import math
 
 # Initialize Engine Core
 pygame.init()
-WIDTH, HEIGHT = 1000, 600
+WIDTH, HEIGHT = 750, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Space Shooter: Infinite Campaign")
 clock = pygame.time.Clock()
@@ -27,6 +28,7 @@ MAGENTA = (255, 0, 255)
 # Global Font Engines
 font = pygame.font.SysFont("Arial", 30)
 button_font = pygame.font.SysFont("Arial", 24)
+MAX_STAGE = 7
 
 # Persistent High Score Tracker
 HS_FILE = "highscore.txt"
@@ -48,23 +50,96 @@ high_score = load_high_score()
 
 # Game Classes: Projectiles and Hazards
 class Laser:
-    def __init__(self, x, y, is_boss=False, dx=0, speed_mult=1.0):
-        self.width = 4
-        self.height = 15
+    def __init__(
+        self,
+        x,
+        y,
+        is_boss=False,
+        dx=0,
+        speed_mult=1.0,
+        bullet_type="normal",
+        wave_amp=0,
+        wave_freq=0,
+        explode_time=0,
+        blast_radius=0,
+    ):
+        self.bullet_type = bullet_type
+        self.large = bullet_type == "large"
+        self.exploding = bullet_type == "exploding"
+        self.explosion_ready = False
+        self.explosion_timer = explode_time
+        self.blast_radius = blast_radius
+        self.wave_amp = wave_amp
+        self.wave_freq = wave_freq
+        self.wave_phase = random.uniform(0, math.pi * 2)
+        self.speed_x = dx
+        self.is_boss = is_boss
+
+        if self.large:
+            self.width = 20
+            self.height = 20
+        elif self.exploding:
+            self.width = 10
+            self.height = 10
+        else:
+            self.width = 4
+            self.height = 15
+
         self.x = x - self.width // 2
         self.y = y
-        self.is_boss = is_boss
-        # Boss projectile speeds escalate with new game loops
-        self.speed_y = -int(6 * speed_mult) if is_boss else 3
-        self.speed_x = dx
+        self.initial_x = self.x
+        self.speed_y = -int(6 * speed_mult) if is_boss else 10
+        self.to_remove = False
 
     def move(self):
+        if self.explosion_ready:
+            self.blast_radius += 4
+            if self.blast_radius > 60:
+                self.to_remove = True
+            return
+
         self.y -= self.speed_y
-        self.x += self.speed_x
+        if self.bullet_type == "wave":
+            self.x = self.initial_x + math.sin(
+                pygame.time.get_ticks() * self.wave_freq + self.wave_phase
+            ) * self.wave_amp
+        else:
+            self.x += self.speed_x
+
+        if self.exploding:
+            self.explosion_timer -= 1
+            if self.explosion_timer <= 0:
+                self.explosion_ready = True
+                self.speed_x = 0
+                self.speed_y = 0
 
     def draw(self):
-        color = ORANGE if self.is_boss else YELLOW
-        pygame.draw.rect(screen, color, (self.x, self.y, self.width, self.height))
+        center = (int(self.x + self.width // 2), int(self.y + self.height // 2))
+        if self.explosion_ready:
+            pygame.draw.circle(screen, RED, center, self.blast_radius, 2)
+            pygame.draw.circle(screen, ORANGE, center, 4)
+            return
+
+        if self.large:
+            pygame.draw.circle(screen, MAGENTA, center, self.width // 2)
+            pygame.draw.circle(screen, WHITE, center, self.width // 2, 2)
+        else:
+            color = ORANGE if self.is_boss else YELLOW
+            pygame.draw.rect(screen, color, (self.x, self.y, self.width, self.height))
+
+        if self.exploding and not self.explosion_ready:
+            pygame.draw.circle(screen, RED, center, self.blast_radius, 1)
+
+    def rect(self):
+        if self.explosion_ready:
+            radius = self.blast_radius
+            return pygame.Rect(
+                int(self.x + self.width // 2 - radius),
+                int(self.y + self.height // 2 - radius),
+                radius * 2,
+                radius * 2,
+            )
+        return pygame.Rect(int(self.x), int(self.y), self.width, self.height)
 
 class Enemy:
     def __init__(self, speed_multiplier):
@@ -95,12 +170,22 @@ class PowerUp:
             pygame.draw.circle(screen, BLUE, (self.x + self.size // 2, self.y + self.size // 2), self.size // 2)
             pygame.draw.circle(screen, CYAN, (self.x + self.size // 2, self.y + self.size // 2), self.size // 2 - 3, 2)
         elif self.type == "firerate":
-            points = [(self.x + self.size // 2, self.y), 
-                      (self.x, self.y + self.size), 
-                      (self.x + self.size, self.y + self.size)]
+            points = [
+                (self.x + self.size // 2, self.y),
+                (self.x, self.y + self.size),
+                (self.x + self.size, self.y + self.size),
+            ]
             pygame.draw.polygon(screen, YELLOW, points)
-        elif self.type =="Heal":
-            pygame.draw.square(screen, RED)
+        elif self.type == "heal":
+            pygame.draw.circle(screen, RED, (self.x + self.size // 2, self.y + self.size // 2), self.size // 2)
+            cross_thickness = 3
+            line_length = self.size - 10
+            cx = self.x + self.size // 2
+            cy = self.y + self.size // 2
+            pygame.draw.line(screen, WHITE, (cx - line_length // 2, cy), (cx + line_length // 2, cy), cross_thickness)
+            pygame.draw.line(screen, WHITE, (cx, cy - line_length // 2), (cx, cy + line_length // 2), cross_thickness)
+
+
 class Player:
     def __init__(self):
         self.width = 36
@@ -126,7 +211,7 @@ class Player:
         if self.fire_rate_timer > 0:
             self.fire_rate_timer -= 1
             
-        current_delay = 0 if self.fire_rate_timer > 0 else 0
+        current_delay = 6 if self.fire_rate_timer > 0 else 10
         
         if keys[pygame.K_SPACE] and self.shoot_cooldown == 0:
             player_lasers.append(Laser(self.x + self.width // 2, self.y))
@@ -170,11 +255,21 @@ class Boss:
             self.max_health = int(320 * self.loop_mult)
             self.base_speed = 3.5 * self.loop_mult
             self.primary_color = ORANGE
-        else: # Stage 5 - Final tier boss inside loop
+        elif self.stage == 5:
             self.width, self.height = 220, 90
             self.max_health = int(450 * self.loop_mult)
             self.base_speed = 2.0 * self.loop_mult
             self.primary_color = MAGENTA
+        elif self.stage == 6:
+            self.width, self.height = 180, 85
+            self.max_health = int(520 * self.loop_mult)
+            self.base_speed = 3.2 * self.loop_mult
+            self.primary_color = BLUE
+        else: # Stage 7 - Apex ritual boss
+            self.width, self.height = 210, 95
+            self.max_health = int(620 * self.loop_mult)
+            self.base_speed = 2.8 * self.loop_mult
+            self.primary_color = WHITE
 
         self.health = self.max_health
         self.speed = self.base_speed
@@ -182,9 +277,12 @@ class Boss:
         self.y = 50
 
     def move(self):
-        if self.health <= (self.max_health / 2) and self.phase == 1:
+        if self.health <= (self.max_health * 0.65) and self.phase == 1:
             self.phase = 2
             self.speed = self.base_speed * 1.8
+        elif self.health <= (self.max_health * 0.35) and self.phase == 2:
+            self.phase = 3
+            self.speed = self.base_speed * 2.2
 
         self.x += self.speed
         if self.x <= 0 or self.x >= WIDTH - self.width:
@@ -192,63 +290,353 @@ class Boss:
 
     def shoot(self, boss_lasers):
         if self.shoot_cooldown <= 0:
-            # Scale firing pacing up slightly as loop limits elevate
-            rate_mod = max(0.5, 2.0 - self.loop_mult)
+            rate_mod = max(0.4, 2.0 - self.loop_mult)
+            center_x = self.x + self.width // 2
+            boss_center_y = self.y + self.height
 
             if self.stage == 1:
                 if self.phase == 1:
-                    boss_lasers.append(Laser(self.x + 20, self.y + self.height, True, 0, self.loop_mult))
-                    boss_lasers.append(Laser(self.x + self.width - 20, self.y + self.height, True, 0, self.loop_mult))
+                    boss_lasers.append(Laser(self.x + 20, boss_center_y, True, 0, self.loop_mult))
+                    boss_lasers.append(Laser(self.x + self.width - 20, boss_center_y, True, 0, self.loop_mult))
                     self.shoot_cooldown = int(45 * rate_mod)
+                elif self.phase == 2:
+                    boss_lasers.append(
+                        Laser(
+                            center_x,
+                            boss_center_y,
+                            True,
+                            0,
+                            self.loop_mult,
+                            bullet_type="wave",
+                            wave_amp=40,
+                            wave_freq=0.020,
+                        )
+                    )
+                    boss_lasers.append(Laser(self.x + 20, boss_center_y, True, -1.5, self.loop_mult))
+                    boss_lasers.append(Laser(self.x + self.width - 20, boss_center_y, True, 1.5, self.loop_mult))
+                    self.shoot_cooldown = int(40 * rate_mod)
                 else:
-                    boss_lasers.append(Laser(self.x + self.width // 2, self.y + self.height, True, 0, self.loop_mult))
-                    boss_lasers.append(Laser(self.x + 20, self.y + self.height, True, -2, self.loop_mult))
-                    boss_lasers.append(Laser(self.x + self.width - 20, self.y + self.height, True, 2, self.loop_mult))
-                    self.shoot_cooldown = int(35 * rate_mod)
+                    boss_lasers.append(
+                        Laser(
+                            center_x,
+                            boss_center_y,
+                            True,
+                            0,
+                            self.loop_mult,
+                            bullet_type="exploding",
+                            explode_time=90,
+                            blast_radius=34,
+                        )
+                    )
+                    self.shoot_cooldown = int(80 * rate_mod)
 
             elif self.stage == 2:
                 if self.phase == 1:
                     fire_x = self.x + 20 if pygame.time.get_ticks() % 400 < 200 else self.x + self.width - 20
-                    boss_lasers.append(Laser(fire_x, self.y + self.height, True, 0, self.loop_mult))
+                    boss_lasers.append(Laser(fire_x, boss_center_y, True, 0, self.loop_mult))
                     self.shoot_cooldown = int(15 * rate_mod)
+                elif self.phase == 2:
+                    boss_lasers.append(
+                        Laser(
+                            self.x + 20,
+                            boss_center_y,
+                            True,
+                            0,
+                            self.loop_mult,
+                            bullet_type="wave",
+                            wave_amp=55,
+                            wave_freq=0.018,
+                        )
+                    )
+                    boss_lasers.append(
+                        Laser(
+                            self.x + self.width - 20,
+                            boss_center_y,
+                            True,
+                            0,
+                            self.loop_mult,
+                            bullet_type="wave",
+                            wave_amp=55,
+                            wave_freq=0.018,
+                        )
+                    )
+                    self.shoot_cooldown = int(28 * rate_mod)
                 else:
-                    boss_lasers.append(Laser(self.x + self.width // 2, self.y + self.height, True, -1, self.loop_mult))
-                    boss_lasers.append(Laser(self.x + self.width // 2, self.y + self.height, True, 1, self.loop_mult))
-                    self.shoot_cooldown = int(12 * rate_mod)
+                    boss_lasers.append(
+                        Laser(
+                            center_x,
+                            boss_center_y,
+                            True,
+                            0,
+                            self.loop_mult,
+                            bullet_type="exploding",
+                            explode_time=80,
+                            blast_radius=42,
+                        )
+                    )
+                    boss_lasers.append(
+                        Laser(
+                            self.x + 20,
+                            boss_center_y,
+                            True,
+                            -1.2,
+                            self.loop_mult,
+                            bullet_type="large",
+                        )
+                    )
+                    self.shoot_cooldown = int(38 * rate_mod)
 
             elif self.stage == 3:
                 if self.phase == 1:
                     for offset in [20, 60, self.width - 60, self.width - 20]:
-                        boss_lasers.append(Laser(self.x + offset, self.y + self.height, True, 0, self.loop_mult))
+                        boss_lasers.append(Laser(self.x + offset, boss_center_y, True, 0, self.loop_mult))
                     self.shoot_cooldown = int(50 * rate_mod)
+                elif self.phase == 2:
+                    boss_lasers.append(
+                        Laser(
+                            self.x + 25,
+                            boss_center_y,
+                            True,
+                            -0.8,
+                            self.loop_mult,
+                            bullet_type="large",
+                        )
+                    )
+                    boss_lasers.append(
+                        Laser(
+                            self.x + self.width - 25,
+                            boss_center_y,
+                            True,
+                            0.8,
+                            self.loop_mult,
+                            bullet_type="large",
+                        )
+                    )
+                    self.shoot_cooldown = int(55 * rate_mod)
                 else:
                     for angle_dx in [-3, -1.5, 0, 1.5, 3]:
-                        boss_lasers.append(Laser(self.x + self.width // 2, self.y + self.height, True, angle_dx, self.loop_mult))
-                    self.shoot_cooldown = int(40 * rate_mod)
+                        boss_lasers.append(
+                            Laser(
+                                center_x,
+                                boss_center_y,
+                                True,
+                                angle_dx,
+                                self.loop_mult,
+                                bullet_type="exploding",
+                                explode_time=82,
+                                blast_radius=36,
+                            )
+                        )
+                    self.shoot_cooldown = int(48 * rate_mod)
 
             elif self.stage == 4:
-                # Stage 4: Moving sweeping perimeter columns
                 if self.phase == 1:
-                    boss_lasers.append(Laser(self.x + 10, self.y + self.height, True, -0.5, self.loop_mult))
-                    boss_lasers.append(Laser(self.x + self.width - 10, self.y + self.height, True, 0.5, self.loop_mult))
+                    boss_lasers.append(Laser(self.x + 10, boss_center_y, True, -0.8, self.loop_mult))
+                    boss_lasers.append(Laser(self.x + self.width - 10, boss_center_y, True, 0.8, self.loop_mult))
                     self.shoot_cooldown = int(25 * rate_mod)
-                else:
+                elif self.phase == 2:
                     for offset in [10, self.width // 2, self.width - 10]:
-                        boss_lasers.append(Laser(self.x + offset, self.y + self.height, True, -1.5, self.loop_mult))
-                        boss_lasers.append(Laser(self.x + offset, self.y + self.height, True, 1.5, self.loop_mult))
+                        boss_lasers.append(
+                            Laser(
+                                self.x + offset,
+                                boss_center_y,
+                                True,
+                                0,
+                                self.loop_mult,
+                                bullet_type="wave",
+                                wave_amp=35,
+                                wave_freq=0.022,
+                            )
+                        )
                     self.shoot_cooldown = int(35 * rate_mod)
+                else:
+                    boss_lasers.append(
+                        Laser(
+                            center_x,
+                            boss_center_y,
+                            True,
+                            0,
+                            self.loop_mult,
+                            bullet_type="large",
+                        )
+                    )
+                    boss_lasers.append(
+                        Laser(
+                            self.x + 20,
+                            boss_center_y,
+                            True,
+                            -1.4,
+                            self.loop_mult,
+                            bullet_type="exploding",
+                            explode_time=70,
+                            blast_radius=40,
+                        )
+                    )
+                    self.shoot_cooldown = int(40 * rate_mod)
 
-            else: # Stage 5 Vanguard Patterns
+            elif self.stage == 5:
                 if self.phase == 1:
                     for idx, offset in enumerate([30, 80, self.width - 80, self.width - 30]):
                         dx_val = -1 if idx < 2 else 1
-                        boss_lasers.append(Laser(self.x + offset, self.y + self.height, True, dx_val, self.loop_mult))
+                        boss_lasers.append(Laser(self.x + offset, boss_center_y, True, dx_val, self.loop_mult))
                     self.shoot_cooldown = int(30 * rate_mod)
-                else:
-                    # Matrix geometric wall burst
+                elif self.phase == 2:
                     for dx_val in [-4, -2.5, -1, 0, 1, 2.5, 4]:
-                        boss_lasers.append(Laser(self.x + self.width // 2, self.y + self.height, True, dx_val, self.loop_mult))
+                        boss_lasers.append(Laser(center_x, boss_center_y, True, dx_val, self.loop_mult))
                     self.shoot_cooldown = int(45 * rate_mod)
+                else:
+                    for offset in [20, 50, self.width - 50, self.width - 20]:
+                        boss_lasers.append(
+                            Laser(
+                                self.x + offset,
+                                boss_center_y,
+                                True,
+                                0,
+                                self.loop_mult,
+                                bullet_type="wave",
+                                wave_amp=60,
+                                wave_freq=0.017,
+                            )
+                        )
+                    boss_lasers.append(
+                        Laser(
+                            center_x,
+                            boss_center_y,
+                            True,
+                            0,
+                            self.loop_mult,
+                            bullet_type="large",
+                        )
+                    )
+                    self.shoot_cooldown = int(42 * rate_mod)
+
+            elif self.stage == 6:
+                if self.phase == 1:
+                    boss_lasers.append(
+                        Laser(
+                            self.x + 30,
+                            boss_center_y,
+                            True,
+                            -0.5,
+                            self.loop_mult,
+                            bullet_type="large",
+                        )
+                    )
+                    boss_lasers.append(
+                        Laser(
+                            self.x + self.width - 30,
+                            boss_center_y,
+                            True,
+                            0.5,
+                            self.loop_mult,
+                            bullet_type="large",
+                        )
+                    )
+                    self.shoot_cooldown = int(40 * rate_mod)
+                elif self.phase == 2:
+                    for offset in [20, self.width - 20]:
+                        boss_lasers.append(
+                            Laser(
+                                self.x + offset,
+                                boss_center_y,
+                                True,
+                                0,
+                                self.loop_mult,
+                                bullet_type="wave",
+                                wave_amp=70,
+                                wave_freq=0.019,
+                            )
+                        )
+                    self.shoot_cooldown = int(35 * rate_mod)
+                else:
+                    boss_lasers.append(
+                        Laser(
+                            center_x,
+                            boss_center_y,
+                            True,
+                            0,
+                            self.loop_mult,
+                            bullet_type="exploding",
+                            explode_time=85,
+                            blast_radius=46,
+                        )
+                    )
+                    boss_lasers.append(
+                        Laser(
+                            self.x + 10,
+                            boss_center_y,
+                            True,
+                            -1.6,
+                            self.loop_mult,
+                            bullet_type="large",
+                        )
+                    )
+                    self.shoot_cooldown = int(48 * rate_mod)
+
+            else:  # Stage 7
+                if self.phase == 1:
+                    for offset in [20, 60, self.width - 60, self.width - 20]:
+                        boss_lasers.append(
+                            Laser(
+                                self.x + offset,
+                                boss_center_y,
+                                True,
+                                0,
+                                self.loop_mult,
+                                bullet_type="wave",
+                                wave_amp=50,
+                                wave_freq=0.023,
+                            )
+                        )
+                    self.shoot_cooldown = int(28 * rate_mod)
+                elif self.phase == 2:
+                    boss_lasers.append(
+                        Laser(
+                            self.x + 20,
+                            boss_center_y,
+                            True,
+                            -1.0,
+                            self.loop_mult,
+                            bullet_type="large",
+                        )
+                    )
+                    boss_lasers.append(
+                        Laser(
+                            self.x + self.width - 20,
+                            boss_center_y,
+                            True,
+                            1.0,
+                            self.loop_mult,
+                            bullet_type="large",
+                        )
+                    )
+                    boss_lasers.append(
+                        Laser(
+                            center_x,
+                            boss_center_y,
+                            True,
+                            0,
+                            self.loop_mult,
+                            bullet_type="exploding",
+                            explode_time=75,
+                            blast_radius=44,
+                        )
+                    )
+                    self.shoot_cooldown = int(38 * rate_mod)
+                else:
+                    for dx_val in [-3.5, -2, -0.5, 0.5, 2, 3.5]:
+                        boss_lasers.append(Laser(center_x, boss_center_y, True, dx_val, self.loop_mult))
+                    boss_lasers.append(
+                        Laser(
+                            center_x,
+                            boss_center_y,
+                            True,
+                            0,
+                            self.loop_mult,
+                            bullet_type="large",
+                        )
+                    )
+                    self.shoot_cooldown = int(40 * rate_mod)
         else:
             self.shoot_cooldown -= 1
 
@@ -301,14 +689,14 @@ def advance_stage():
     stage_clear_timer = 0
     
     # Progress stage index across infinite boundaries
-    if current_stage < 5:
+    if current_stage < MAX_STAGE:
         current_stage += 1
     else:
         current_stage = 1
         current_loop += 1
         
     # Calculate compound difficulty modifier based on total stages depth
-    total_stages_cleared = ((current_loop - 1) * 5) + current_stage
+    total_stages_cleared = ((current_loop - 1) * MAX_STAGE) + current_stage
     
     # CRITICAL FIX: Explicitly generate a brand new active wave of falling red balls
     for _ in range(6):
@@ -353,7 +741,13 @@ while running:
 
             # Random item drop rates
             if random.randint(1, 450) == 1:
-                item_type = "shield" if random.randint(1, 2) == 1 else "firerate"
+                item_choice = random.randint(1, 3)
+                if item_choice == 1:
+                    item_type = "shield"
+                elif item_choice == 2:
+                    item_type = "firerate"
+                else:
+                    item_type = "heal"
                 powerups.append(PowerUp(item_type))
 
             if boss_active and boss:
@@ -362,7 +756,10 @@ while running:
 
             for laser in lasers[:]:
                 laser.move()
-                if laser.y < 0 or laser.y > HEIGHT or laser.x < 0 or laser.x > WIDTH:
+                if laser.to_remove:
+                    lasers.remove(laser)
+                    continue
+                if not laser.explosion_ready and (laser.y < 0 or laser.y > HEIGHT or laser.x < 0 or laser.x > WIDTH):
                     lasers.remove(laser)
 
             for pu in powerups[:]:
@@ -401,15 +798,37 @@ while running:
                         player.shield_active = True
                     elif pu.type == "firerate":
                         player.fire_rate_timer = 420
+                    elif pu.type == "heal":
+                        player.health = min(player.max_health, player.health + int(player.max_health * 0.3))
                     powerups.remove(pu)
 
+            # Handle boss bullets hitting the player and player bullets hitting boss bullets first
+            for player_laser in lasers[:]:
+                if player_laser.is_boss:
+                    continue
+                player_laser_rect = player_laser.rect()
+                for boss_laser in lasers[:]:
+                    if not boss_laser.is_boss:
+                        continue
+                    if player_laser_rect.colliderect(boss_laser.rect()):
+                        if player_laser in lasers:
+                            lasers.remove(player_laser)
+                        if boss_laser in lasers:
+                            if boss_laser.large or boss_laser.exploding:
+                                boss_laser.to_remove = True
+                            else:
+                                lasers.remove(boss_laser)
+                        break
+
             for laser in lasers[:]:
-                laser_rect = pygame.Rect(laser.x, laser.y, laser.width, laser.height)
+                laser_rect = laser.rect()
                 if laser.is_boss:
                     if laser_rect.colliderect(player_rect):
                         if laser in lasers: lasers.remove(laser)
-                        if player.shield_active: player.shield_active = False
-                        else: player.health -= 15
+                        if player.shield_active:
+                            player.shield_active = False
+                        else:
+                            player.health -= 15
                         if player.health <= 0:
                             game_over = True
                             pygame.mouse.set_visible(True)
@@ -461,8 +880,8 @@ while running:
         draw_health_bar(screen, WIDTH // 2 - 150, 45, boss.health, boss.max_health, width=300, height=15, bar_color=boss.primary_color)
 
     if stage_clear_timer > 0:
-        msg = f"STAGE {current_stage} CLEAR! WARPING..." if current_stage < 5 else f"LOOP {current_loop} COMPLETE! ENTERING NEW GALAXY LAYER..."
-        clear_color = CYAN if current_stage < 5 else GOLD
+        msg = f"STAGE {current_stage} CLEAR! WARPING..." if current_stage < MAX_STAGE else f"LOOP {current_loop} COMPLETE! ENTERING NEW GALAXY LAYER..."
+        clear_color = CYAN if current_stage < MAX_STAGE else GOLD
         clear_banner = font.render(msg, True, clear_color)
         screen.blit(clear_banner, clear_banner.get_rect(center=(WIDTH // 2, HEIGHT // 2)))
 
