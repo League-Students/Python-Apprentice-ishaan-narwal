@@ -126,7 +126,7 @@ class Player:
         if self.fire_rate_timer > 0:
             self.fire_rate_timer -= 1
             
-        current_delay = 6 if self.fire_rate_timer > 0 else 10
+        current_delay = 1 if self.fire_rate_timer > 0 else 0.001
         
         if keys[pygame.K_SPACE] and self.shoot_cooldown == 0:
             player_lasers.append(Laser(self.x + self.width // 2, self.y))
