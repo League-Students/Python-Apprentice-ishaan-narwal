@@ -400,7 +400,7 @@ while running:
                     if pu.type == "shield":
                         player.shield_active = True
                     elif pu.type == "firerate":
-                        player.fire_rate_timer = 99999999999
+                        player.fire_rate_timer = 420
                     powerups.remove(pu)
 
             for laser in lasers[:]:
