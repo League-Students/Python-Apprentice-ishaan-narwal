@@ -2,10 +2,10 @@ import sys
 import random
 import pygame
 
-
+# --- Constants ---
 WIDTH, HEIGHT = 800, 600
 FPS = 60
-SCREEN_RECT = pygame.Rect(0, 0, WIDTH, HEIGHT)  # FIXED: Global reference to prevent NameError crashing
+SCREEN_RECT = pygame.Rect(0, 0, WIDTH, HEIGHT)
 
 # Colors
 COLOR_BG = (10, 12, 24)       
@@ -17,8 +17,9 @@ COLOR_RAPID = (255, 180, 0)
 COLOR_BOSS = (230, 0, 100)     
 WHITE = (255, 255, 255)
 
-# Initialize Pygame & Screen Globally
+# Initialize Pygame Safely
 pygame.init()
+pygame.font.init() # Explicitly initialize font system
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Ultimate Space Boss Rush")
 clock = pygame.time.Clock()
@@ -54,7 +55,6 @@ class Player(pygame.sprite.Sprite):
         self.rect.centerx = WIDTH // 2
         self.rect.bottom = HEIGHT - 30
         
-        # Stats
         self.health = 100
         self.max_health = 100
         self.base_cooldown = 20  
@@ -65,7 +65,7 @@ class Player(pygame.sprite.Sprite):
     def update(self):
         keys = pygame.key.get_pressed()
         self.rect.x += (keys[pygame.K_d] - keys[pygame.K_a]) * self.speed
-        self.rect.clamp_ip(SCREEN_RECT)  # FIXED: Uses global SCREEN_RECT instead of local screen variable
+        self.rect.clamp_ip(SCREEN_RECT)
         
         if self.shoot_cooldown_timer > 0:
             self.shoot_cooldown_timer -= 1
@@ -210,9 +210,13 @@ class Drop(pygame.sprite.Sprite):
 
 # --- UI Helper ---
 def draw_ui_text(surface, text, size, color, x, y):
-    font = pygame.font.SysFont("Impact", size)
-    img = font.render(text, True, color)
-    surface.blit(img, (x, y))
+    # FIXED: Replaced "Impact" font with None to guarantee default cross-platform system font compatibility
+    try:
+        font = pygame.font.SysFont(None, size)
+        img = font.render(text, True, color)
+        surface.blit(img, (x, y))
+    except Exception:
+        pass # Ultimate fallback defense against font rendering engine crashes
 
 def main():
     player = Player()
@@ -296,4 +300,3 @@ def main():
                         
                         if boss_tier >= 5:
                             screen.fill(COLOR_BG)
-                            draw_ui_text(screen, "UNIVERSAL VICTORY!", 54, COLOR_BULLET, WIDTH // 4, HEIGHT // 2 - 30)
