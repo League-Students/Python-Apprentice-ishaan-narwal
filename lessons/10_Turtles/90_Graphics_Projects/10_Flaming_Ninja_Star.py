@@ -1,247 +1,224 @@
+import math
 import random
+import sys
+import pygame
 
-# --- Window Settings ---
-TITLE = "Space Boss Rush"
-WIDTH = 800
-HEIGHT = 600
+# --- Constants ---
+WIDTH, HEIGHT = 800, 600
+FPS = 60
+PLAYER_SPEED = 5
+BULLET_SPEED = 7
 
-# --- State ---
-game_state = "BALLS"  # BALLS, BOSS, GAME_OVER, VICTORY
-boss_tier = 1
-balls_destroyed = 0
-balls_needed = 30
-score = 0
+# Colors
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+RED = (255, 0, 0)
+GREEN = (0, 255, 0)
+BLUE = (0, 0, 255)
+YELLOW = (255, 255, 0)
+
+# Initialize
+pygame.init()
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("2D Boss Rush Shooter")
+clock = pygame.time.Clock()
+
 
 # --- Classes ---
-class Player:
-    def __init__(self):
-        self.x = WIDTH // 2
-        self.y = HEIGHT - 50
-        self.health = 100
-        self.max_health = 100
-        self.speed = 6
-        self.cooldown = 0
-        self.rapid_stacks = 0
+class Player(pygame.sprite.Sprite):
 
-    def update(self, move_dir):
-        self.x += move_dir * self.speed
-        if self.x < 20: self.x = 20
-        if self.x > WIDTH - 20: self.x = WIDTH - 20
-        if self.cooldown > 0: self.cooldown -= 1
+    def __init__(self):
+        super().__init__()
+        self.image = pygame.Surface((30, 30))
+        self.image.fill(GREEN)
+        self.rect = self.image.get_rect()
+        self.rect.centerx = WIDTH // 2
+        self.rect.bottom = HEIGHT - 20
+
+    def update(self):
+        keys = pygame.key.get_pressed()
+        self.rect.x += (
+            keys[pygame.K_d] - keys[pygame.K_a]
+        ) * PLAYER_SPEED  # Only A and D are evaluated
+        self.rect.clamp_ip(screen.get_rect())
 
     def shoot(self):
-        delay = max(2, 20 - (self.rapid_stacks * 3))
-        if self.cooldown == 0:
-            self.cooldown = delay
-            bullets.append(Bullet(self.x, self.y - 20))
+        return Bullet(self.rect.centerx, self.rect.top)
 
-class Bullet:
+
+class Bullet(pygame.sprite.Sprite):
+
     def __init__(self, x, y):
-        self.x = x
-        self.y = y
-        self.speed = 9
-        self.alive = True
+        super().__init__()
+        self.image = pygame.Surface((5, 15))
+        self.image.fill(WHITE)
+        self.rect = self.image.get_rect()
+        self.rect.centerx = x
+        self.rect.bottom = y
 
     def update(self):
-        self.y -= self.speed
-        if self.y < 0: self.alive = False
+        self.rect.y -= BULLET_SPEED
+        if self.rect.bottom < 0:
+            self.kill()
 
-class RedBall:
-    def __init__(self):
-        self.x = random.randint(20, WIDTH - 20)
-        self.y = random.randint(-100, -20)
-        self.speed = random.uniform(2, 4)
-        self.alive = True
 
-    def update(self):
-        self.y += self.speed
-        if self.y > HEIGHT:
-            self.x = random.randint(20, WIDTH - 20)
-            self.y = random.randint(-100, -20)
+class Boss(pygame.sprite.Sprite):
 
-class Boss:
     def __init__(self, tier):
+        super().__init__()
         self.tier = tier
-        self.size = 60 + (tier * 10)
-        self.x = WIDTH // 2
-        self.y = 80
-        self.health = tier * 30
+        size = 50 + (tier * 10)
+        self.image = pygame.Surface((size, size))
+        self.image.fill(RED)
+        self.rect = self.image.get_rect()
+        self.rect.x = random.randint(0, WIDTH - size)
+        self.rect.y = 50
+
+        # Boss attributes
+        self.health = tier * 3
         self.max_health = self.health
         self.direction = 1
-        self.speed = 2 + (tier * 0.5)
+        self.speed = 2 + tier
         self.shoot_timer = 0
-        self.shoot_interval = max(15, 50 - (tier * 6))
+        self.shoot_interval = 60 - (tier * 8)
 
     def update(self):
-        self.x += self.speed * self.direction
-        if self.x >= WIDTH - self.size or self.x <= self.size:
+        # Boss Movement
+        self.rect.x += self.speed * self.direction
+        if self.rect.right >= WIDTH or self.rect.left <= 0:
             self.direction *= -1
 
+        # Boss Shooting
         self.shoot_timer += 1
         if self.shoot_timer >= self.shoot_interval:
             self.shoot_timer = 0
-            boss_bullets.append(BossBullet(self.x, self.y + 20, self.tier))
+            return BossBullet(self.rect.centerx, self.rect.bottom, self.tier)
+        return None
 
-class BossBullet:
+    def draw_health(self, surface):
+        ratio = self.health / self.max_health
+        pygame.draw.rect(
+            surface, RED, (self.rect.x, self.rect.y - 15, self.rect.width, 10)
+        )
+        pygame.draw.rect(
+            surface,
+            GREEN,
+            (
+                self.rect.x,
+                self.rect.y - 15,
+                int(self.rect.width * ratio),
+                10,
+            ),
+        )
+
+
+class BossBullet(pygame.sprite.Sprite):
+
     def __init__(self, x, y, tier):
-        self.x = x
-        self.y = y
-        self.damage = 10 + (tier * 2)
-        self.dy = 4 + tier
-        self.dx = random.choice([-1.5, 0, 1.5]) if tier >= 3 else 0
-        self.alive = True
+        super().__init__()
+        self.image = pygame.Surface((10, 10))
+        self.image.fill(YELLOW)
+        self.rect = self.image.get_rect()
+        self.rect.centerx = x
+        self.rect.centery = y
+        self.tier = tier
+
+        # Trajectory towards player (simplified downward or tracking)
+        self.dx = 0
+        self.dy = 3 + tier
 
     def update(self):
-        self.x += self.dx
-        self.y += self.dy
-        if self.y > HEIGHT:
-            self.alive = False
+        self.rect.x += self.dx
+        self.rect.y += self.dy
+        if self.rect.top > HEIGHT:
+            self.kill()
 
-class Drop:
-    def __init__(self, x, y, drop_type):
-        self.x = x
-        self.y = y
-        self.type = drop_type 
-        self.speed = 3
-        self.alive = True
 
-    def update(self):
-        self.y += self.speed
-        if self.y > HEIGHT:
-            self.alive = False
+# --- Game State ---
+def draw_text(text, size, color, x, y):
+    font = pygame.font.SysFont(None, size)
+    img = font.render(text, True, color)
+    screen.blit(img, (x, y))
 
-# --- Setup ---
-player = Player()
-bullets = []
-red_balls = [RedBall() for _ in range(8)]
-boss_bullets = []
-drops = []
-boss = None
-stars = [{"x": random.randint(0, WIDTH), "y": random.randint(0, HEIGHT), "speed": random.uniform(0.5, 3)} for _ in range(40)]
 
-# --- Engine Loops ---
-def update():
-    global game_state, boss_tier, balls_destroyed, score, boss
-    
-    if game_state in ["GAME_OVER", "VICTORY"]:
-        return
+def main():
+    player = Player()
+    all_sprites = pygame.sprite.Group()
+    all_sprites.add(player)
 
-    for s in stars:
-        s["y"] += s["speed"]
-        if s["y"] > HEIGHT:
-            s["y"] = 0
-            s["x"] = random.randint(0, WIDTH)
+    bullets = pygame.sprite.Group()
+    enemy_bullets = pygame.sprite.Group()
 
-    # Strictly horizontal WASD: checks 'd' and 'a', ignores 'w' and 's'
-    move_dir = 0
-    if keyboard.d: move_dir += 1
-    if keyboard.a: move_dir -= 1
-    player.update(move_dir)
-    
-    if keyboard.space or keyboard.j:
-        player.shoot()
+    boss_tier = 1
+    boss = Boss(boss_tier)
+    all_sprites.add(boss)
 
-    for b in bullets: b.update()
-    for d in drops: d.update()
-    for bb in boss_bullets: bb.update()
-    
-    bullets[:] = [b for b in bullets if b.alive]
-    drops[:] = [d for d in drops if d.alive]
-    boss_bullets[:] = [bb for bb in boss_bullets if bb.alive]
+    score = 0
+    font = pygame.font.SysFont(None, 36)
 
-    if game_state == "BALLS":
-        for rb in red_balls:
-            rb.update()
-            for b in bullets:
-                if abs(b.x - rb.x) < 20 and abs(b.y - rb.y) < 20:
-                    rb.alive = False
-                    b.alive = False
-                    balls_destroyed += 1
-                    score += 5
-                    if random.random() < 0.40:
-                        drops.append(Drop(rb.x, rb.y, "RAPID" if random.random() < 0.70 else "SHIELD"))
+    # Game Loop
+    while True:
+        clock.tick(FPS)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    bullet = player.shoot()
+                    all_sprites.add(bullet)
+                    bullets.add(bullet)
 
-        for i, rb in enumerate(red_balls):
-            if not rb.alive: red_balls[i] = RedBall()
+        # Update
+        all_sprites.update()
 
-        if balls_destroyed >= balls_needed:
-            game_state = "BOSS"
-            boss = Boss(boss_tier)
-            boss_bullets.clear()
+        # Boss Bullet Spawn
+        result = boss.update()
+        if isinstance(result, BossBullet):
+            all_sprites.add(result)
+            enemy_bullets.add(result)
 
-    elif game_state == "BOSS" and boss:
-        boss.update()
-        for b in bullets:
-            if abs(b.x - boss.x) < (boss.size//2) and abs(b.y - boss.y) < (boss.size//2):
-                b.alive = False
-                boss.health -= 1
-                score += 15
-                if boss.health <= 0:
-                    boss = None
-                    if boss_tier >= 5:
-                        game_state = "VICTORY"
-                    else:
-                        boss_tier += 1
-                        game_state = "BALLS"
-                        balls_destroyed = 0
-                    break
+        # Bullet -> Boss Collision
+        hits = pygame.sprite.spritecollide(boss, bullets, True)
+        for hit in hits:
+            boss.health -= 1
+            score += 10
+            if boss.health <= 0:
+                boss.kill()
+                boss_tier += 1
+                if boss_tier > 5:
+                    # Victory State
+                    screen.fill(BLACK)
+                    draw_text("VICTORY! YOU DEFEATED ALL 5 BOSSES!", 48, GREEN, 80, 250)
+                    pygame.display.flip()
+                    pygame.time.wait(3000)
+                    pygame.quit()
+                    sys.exit()
+                else:
+                    boss = Boss(boss_tier)
+                    all_sprites.add(boss)
 
-    for d in drops:
-        if abs(d.x - player.x) < 25 and abs(d.y - player.y) < 25:
-            d.alive = False
-            if d.type == "SHIELD":
-                player.health = min(player.max_health, player.health + 25)
-            else:
-                player.rapid_stacks += 1
+        # Player -> Enemy Bullet Collision
+        if pygame.sprite.spritecollideany(player, enemy_bullets):
+            # Game Over State
+            screen.fill(BLACK)
+            draw_text("GAME OVER", 64, RED, 280, 250)
+            pygame.display.flip()
+            pygame.time.wait(3000)
+            pygame.quit()
+            sys.exit()
 
-    for bb in boss_bullets:
-        if abs(bb.x - player.x) < 22 and abs(bb.y - player.y) < 22:
-            bb.alive = False
-            player.health -= bb.damage
-            if player.health <= 0:
-                game_state = "GAME_OVER"
+        # Draw
+        screen.fill(BLACK)
+        all_sprites.draw(screen)
+        boss.draw_health(screen)
 
-def draw():
-    screen.fill((10, 12, 24))
-    
-    for s in stars:
-        screen.draw.filled_circle((int(s["x"]), int(s["y"])), 1, (180, 180, 180))
+        # UI Drawing
+        draw_text(f"Score: {score}", 24, WHITE, 10, 10)
+        draw_text(f"Boss Tier: {boss_tier}/5", 24, WHITE, WIDTH - 150, 10)
 
-    if game_state == "GAME_OVER":
-        screen.draw.text("SYSTEM TERMINATED", center=(WIDTH // 2, HEIGHT // 2), color=(255, 40, 80), fontsize=60)
-        screen.draw.text(f"FINAL SCORE: {score}", center=(WIDTH // 2, HEIGHT // 2 + 50), color=(255, 255, 255), fontsize=30)
-        return
+        pygame.display.flip()
 
-    if game_state == "VICTORY":
-        screen.draw.text("UNIVERSAL VICTORY!", center=(WIDTH // 2, HEIGHT // 2), color=(0, 255, 150), fontsize=60)
-        screen.draw.text(f"FINAL SCORE: {score}", center=(WIDTH // 2, HEIGHT // 2 + 50), color=(255, 255, 255), fontsize=30)
-        return
 
-    screen.draw.filled_polygon([(int(player.x), int(player.y - 20)), (int(player.x - 20), int(player.y + 20)), (int(player.x + 20), int(player.y + 20))], (0, 210, 255))
-    
-    for b in bullets:
-        screen.draw.filled_rect(rect((int(b.x - 3), int(b.y - 8)), (6, 16)), (0, 255, 150))
-        
-    for d in drops:
-        screen.draw.filled_circle((int(d.x), int(d.y)), 10, (255, 180, 0) if d.type == "RAPID" else (0, 150, 255))
-        
-    for bb in boss_bullets:
-        screen.draw.filled_circle((int(bb.x), int(bb.y)), 6, (255, 255, 100))
-
-    if game_state == "BALLS":
-        for rb in red_balls:
-            screen.draw.filled_circle((int(rb.x), int(rb.y)), 12, (255, 40, 80))
-        screen.draw.text(f"RED BALLS: {balls_destroyed} / {balls_needed}", (WIDTH // 2 - 90, 20), color=(255, 40, 80), fontsize=30)
-    elif game_state == "BOSS" and boss:
-        screen.draw.filled_rect(rect((int(boss.x - boss.size//2), int(boss.y - boss.size//2)), (boss.size, boss.size)), (230, 0, 100))
-        ratio = max(0.0, boss.health / boss.max_health)
-        screen.draw.filled_rect(rect((WIDTH//2 - 200, 25), (400, 12)), (60, 20, 30))
-        screen.draw.filled_rect(rect((WIDTH//2 - 200, 25), (int(400 * ratio), 12)), (230, 0, 100))
-        screen.draw.text(f"BOSS TIER: {boss_tier} / 5", (WIDTH // 2 - 60, 45), color=(230, 0, 100), fontsize=24)
-
-    screen.draw.filled_rect(rect((20, HEIGHT - 35), (200, 15)), (50, 50, 50))
-    p_ratio = max(0.0, player.health / player.max_health)
-    screen.draw.filled_rect(rect((20, HEIGHT - 35), (int(200 * p_ratio), 15)), (0, 210, 255))
-    
-    screen.draw.text(f"SCORE: {score}", (20, 20), color=(255, 255, 255), fontsize=24)
-    screen.draw.text(f"RAPID SPEED STACKS: {player.rapid_stacks}", (20, 48), color=(255, 180, 0), fontsize=20)
+if __name__ == "__main__":
+    main()
