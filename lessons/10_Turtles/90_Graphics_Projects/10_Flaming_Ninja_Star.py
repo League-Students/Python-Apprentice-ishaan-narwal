@@ -5,6 +5,7 @@ import pygame
 # --- Constants ---
 WIDTH, HEIGHT = 800, 600
 FPS = 60
+SCREEN_RECT = pygame.Rect(0, 0, WIDTH, HEIGHT)  # FIXED: Global reference to prevent NameError crashing
 
 # Colors
 COLOR_BG = (10, 12, 24)       
@@ -16,7 +17,7 @@ COLOR_RAPID = (255, 180, 0)
 COLOR_BOSS = (230, 0, 100)     
 WHITE = (255, 255, 255)
 
-# Initialize
+# Initialize Pygame & Screen Globally
 pygame.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Ultimate Space Boss Rush")
@@ -64,15 +65,13 @@ class Player(pygame.sprite.Sprite):
     def update(self):
         keys = pygame.key.get_pressed()
         self.rect.x += (keys[pygame.K_d] - keys[pygame.K_a]) * self.speed
-        self.rect.clamp_ip(screen.get_rect())
+        self.rect.clamp_ip(SCREEN_RECT)  # FIXED: Uses global SCREEN_RECT instead of local screen variable
         
         if self.shoot_cooldown_timer > 0:
             self.shoot_cooldown_timer -= 1
 
     def shoot(self):
-        # FIXED: Hard protection limit ensuring firing speed remains stable regardless of infinite stacking
         actual_cooldown = max(2, self.base_cooldown - (self.rapid_fire_stacks * 3))
-        
         if self.shoot_cooldown_timer == 0:
             self.shoot_cooldown_timer = actual_cooldown
             return Bullet(self.rect.centerx, self.rect.top)
@@ -210,16 +209,13 @@ class Drop(pygame.sprite.Sprite):
 
 
 # --- UI Helper ---
-def draw_ui_text(text, size, color, x, y):
+def draw_ui_text(surface, text, size, color, x, y):
     font = pygame.font.SysFont("Impact", size)
     img = font.render(text, True, color)
-    screen.blit(img, (x, y))
+    surface.blit(img, (x, y))
 
 def main():
     player = Player()
-    
-    all_sprites = pygame.sprite.Group()
-    all_sprites.add(player)
     
     bullets = pygame.sprite.Group()
     red_balls = pygame.sprite.Group()
@@ -235,10 +231,8 @@ def main():
     balls_needed = 30
     score = 0
 
-    # Spawn first wave of red balls
     for _ in range(8):
         rb = RedBall()
-        all_sprites.add(rb)
         red_balls.add(rb)
 
     while True:
@@ -253,18 +247,20 @@ def main():
         if keys[pygame.K_SPACE] or keys[pygame.K_j]:
             b = player.shoot()
             if b:
-                all_sprites.add(b)
                 bullets.add(b)
 
         for star in stars:
             star.update()
 
-        all_sprites.update()
+        player.update()
+        bullets.update()
+        drops.update()
+        enemy_bullets.update()
 
         if game_state == "BALLS":
+            red_balls.update()
             if len(red_balls) < 8:
                 rb = RedBall()
-                all_sprites.add(rb)
                 red_balls.add(rb)
                 
             hits = pygame.sprite.groupcollide(red_balls, bullets, True, True)
@@ -275,28 +271,29 @@ def main():
                 if random.random() < 0.40:
                     d_type = "RAPID" if random.random() < 0.70 else "SHIELD"
                     drop = Drop(hit.rect.centerx, hit.rect.centery, d_type)
-                    all_sprites.add(drop)
                     drops.add(drop)
 
                 if balls_destroyed_this_phase >= balls_needed:
-                    for ball in red_balls:
-                        ball.kill()
-                    # FIXED: Changed scope logic to clean up old boss projectles and accurately inject next tier
+                    red_balls.empty()
                     enemy_bullets.empty() 
                     game_state = "BOSS"
-                    new_boss = Boss(boss_tier)
-                    all_sprites.add(new_boss)
-                    boss_group.add(new_boss)
+                    boss_group.add(Boss(boss_tier))
                     balls_destroyed_this_phase = 0
 
         elif game_state == "BOSS":
             current_boss = boss_group.sprite
-            # FIXED: Guard statement added to ensure update functions only proceed if boss exists
             if current_boss:
                 boss_action = current_boss.update()
                 if isinstance(boss_action, BossBullet):
-                    all_sprites.add(boss_action)
                     enemy_bullets.add(boss_action)
 
                 boss_hits = pygame.sprite.spritecollide(current_boss, bullets, True)
                 for _ in boss_hits:
+                    current_boss.health -= 1
+                    score += 15
+                    if current_boss.health <= 0:
+                        current_boss.kill()
+                        
+                        if boss_tier >= 5:
+                            screen.fill(COLOR_BG)
+                            draw_ui_text(screen, "UNIVERSAL VICTORY!", 54, COLOR_BULLET, WIDTH // 4, HEIGHT // 2 - 30)
