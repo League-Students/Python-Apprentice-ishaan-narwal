@@ -6,7 +6,7 @@ WIDTH = 800
 HEIGHT = 600
 
 # --- Game State Globals ---
-game_state = "BALLS"  # "BALLS" or "BOSS"
+game_state = "BALLS"  # "BALLS", "BOSS", "GAME_OVER", or "VICTORY"
 boss_tier = 1
 balls_destroyed = 0
 balls_needed = 30
@@ -24,7 +24,7 @@ class Player:
         self.rapid_stacks = 0
 
     def update(self):
-        # STRICTOR WASD CHECK: Stripping W/S entirely, only tracking A/D
+        # Explicitly tracking only A and D keys for horizontal movement
         if keyboard.d:
             self.x += self.speed
         if keyboard.a:
@@ -38,7 +38,6 @@ class Player:
             self.cooldown -= 1
 
     def shoot(self):
-        # Defensive stack tracking limit to prevent frame overflow locks
         actual_delay = max(2, 20 - (self.rapid_stacks * 3))
         if self.cooldown == 0:
             self.cooldown = actual_delay
@@ -108,10 +107,10 @@ class BossBullet:
             self.alive = False
 
 class Drop:
-    def __init__(self, x, y, type):
+    def __init__(self, x, y, drop_type):
         self.x = x
         self.y = y
-        self.type = type # "SHIELD" or "RAPID"
+        self.type = drop_type # "SHIELD" or "RAPID"
         self.speed = 3
         self.alive = True
 
@@ -135,6 +134,10 @@ stars = [{"x": random.randint(0, WIDTH), "y": random.randint(0, HEIGHT), "speed"
 def update():
     global game_state, boss_tier, balls_destroyed, score, boss
     
+    # Freeze updates if game is in a final state
+    if game_state in ["GAME_OVER", "VICTORY"]:
+        return
+
     # Background Star Parallax Engine
     for s in stars:
         s["y"] += s["speed"]
@@ -169,7 +172,6 @@ def update():
                     balls_destroyed += 1
                     score += 5
                     
-                    # 40% Item Spawning Chance
                     if random.random() < 0.40:
                         d_type = "RAPID" if random.random() < 0.70 else "SHIELD"
                         drops.append(Drop(rb.x, rb.y, d_type))
@@ -196,13 +198,12 @@ def update():
                 if boss.health <= 0:
                     boss = None
                     if boss_tier >= 5:
-                        print("VICTORY! ALL BOSSES DEFEATED!")
-                        sys.exit()
+                        game_state = "VICTORY"
                     else:
                         boss_tier += 1
                         game_state = "BALLS"
                         balls_destroyed = 0
-                        break
+                    break
 
     # Item pickup detection
     for d in drops:
@@ -219,8 +220,7 @@ def update():
             bb.alive = False
             player.health -= bb.damage
             if player.health <= 0:
-                print("SYSTEM TERMINATED. GAME OVER.")
-                sys.exit()
+                game_state = "GAME_OVER"
 
 def draw():
     screen.fill((10, 12, 24))
@@ -229,12 +229,22 @@ def draw():
     for s in stars:
         screen.draw.filled_circle((int(s["x"]), int(s["y"])), 1, (180, 180, 180))
 
+    if game_state == "GAME_OVER":
+        screen.draw.text("SYSTEM TERMINATED", center=(WIDTH // 2, HEIGHT // 2), color=(255, 40, 80), fontsize=60)
+        screen.draw.text(f"FINAL SCORE: {score}", center=(WIDTH // 2, HEIGHT // 2 + 50), color=(255, 255, 255), fontsize=30)
+        return
+
+    if game_state == "VICTORY":
+        screen.draw.text("UNIVERSAL VICTORY!", center=(WIDTH // 2, HEIGHT // 2), color=(0, 255, 150), fontsize=60)
+        screen.draw.text(f"FINAL SCORE: {score}", center=(WIDTH // 2, HEIGHT // 2 + 50), color=(255, 255, 255), fontsize=30)
+        return
+
     # Draw Player (Cyan Rocket Core)
     screen.draw.filled_polygon([(player.x, player.y - 20), (player.x - 20, player.y + 20), (player.x + 20, player.y + 20)], (0, 210, 255))
     
-    # Draw Collections
+    # Draw Collections (FIXED: Using lowercase rect to comply with pgzero standard)
     for b in bullets:
-        screen.draw.filled_rect(Rect((b.x - 3, b.y - 8), (6, 16)), (0, 255, 150))
+        screen.draw.filled_rect(rect((b.x - 3, b.y - 8), (6, 16)), (0, 255, 150))
         
     for d in drops:
         color = (255, 180, 0) if d.type == "RAPID" else (0, 150, 255)
@@ -249,17 +259,17 @@ def draw():
         screen.draw.text(f"RED BALLS: {balls_destroyed} / {balls_needed}", (WIDTH // 2 - 90, 20), color=(255, 40, 80), fontsize=30)
     elif game_state == "BOSS" and boss:
         # Draw Boss (Magenta Red Prism Target)
-        screen.draw.filled_rect(Rect((boss.x - boss.size//2, boss.y - boss.size//2), (boss.size, boss.size)), (230, 0, 100))
+        screen.draw.filled_rect(rect((boss.x - boss.size//2, boss.y - boss.size//2), (boss.size, boss.size)), (230, 0, 100))
         # Boss Health Bar
         ratio = max(0.0, boss.health / boss.max_health)
-        screen.draw.filled_rect(Rect((WIDTH//2 - 200, 25), (400, 12)), (60, 20, 30))
-        screen.draw.filled_rect(Rect((WIDTH//2 - 200, 25), (int(400 * ratio), 12)), (230, 0, 100))
+        screen.draw.filled_rect(rect((WIDTH//2 - 200, 25), (400, 12)), (60, 20, 30))
+        screen.draw.filled_rect(rect((WIDTH//2 - 200, 25), (int(400 * ratio), 12)), (230, 0, 100))
         screen.draw.text(f"BOSS TIER: {boss_tier} / 5", (WIDTH // 2 - 60, 45), color=(230, 0, 100), fontsize=24)
 
     # Heads Up Display Metrics
-    screen.draw.filled_rect(Rect((20, HEIGHT - 35), (200, 15)), (50, 50, 50))
+    screen.draw.filled_rect(rect((20, HEIGHT - 35), (200, 15)), (50, 50, 50))
     p_ratio = max(0.0, player.health / player.max_health)
-    screen.draw.filled_rect(Rect((20, HEIGHT - 35), (int(200 * p_ratio), 15)), (0, 210, 255))
+    screen.draw.filled_rect(rect((20, HEIGHT - 35), (int(200 * p_ratio), 15)), (0, 210, 255))
     
     screen.draw.text(f"SCORE: {score}", (20, 20), color=(255, 255, 255), fontsize=24)
     screen.draw.text(f"RAPID SPEED STACKS: {player.rapid_stacks}", (20, 48), color=(255, 180, 0), fontsize=20)
