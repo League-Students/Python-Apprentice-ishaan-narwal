@@ -47,7 +47,7 @@ def exit_cam():
     print("CAM EXITED")
     screen.bgcolor("yellow")
     show_anamatronics(-1)
-exit_cam()
+
 
 screen.listen()
 screen.onkey(open_cam_1, "1")
