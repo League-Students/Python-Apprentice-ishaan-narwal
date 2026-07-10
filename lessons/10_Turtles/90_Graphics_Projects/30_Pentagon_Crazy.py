@@ -68,7 +68,7 @@ def exit_cam():
     print("CAM EXITED")
     screen.bgcolor("yellow")
     show_anamatronics()
-
+def
 
 screen.listen()
 screen.onkey(open_cam_1, "1")
@@ -77,6 +77,8 @@ screen.onkey(open_cam_3, "3")
 screen.onkey(open_cam_4, "4")
 screen.onkey(open_cam_5, "5")
 screen.onkey(exit_cam, "0")
+screen.onkey(scare_tina, "0")
+
 
 screen.ontimer(move_tina, 2000)
 
