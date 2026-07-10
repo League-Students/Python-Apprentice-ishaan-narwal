@@ -18,7 +18,7 @@ def move_tina():
     if tina_progress == len(tina_path)-1:
         print("GAME OVER")
     else: 
-    shown_anamatronics()
+    show_anamatronics()
     screen.ontimer(move_tina, 2000)
     
 def show_anamatronics():
@@ -71,7 +71,7 @@ def exit_cam():
 def scare_tina():
     global tina_progress
     global cam_num
-    if tina_progress == len(tina_path)-1 and cam_num
+    if tina_progress == len(tina_path)-1 and cam_num == 0
 
 screen.listen()
 screen.onkey(open_cam_1, "1")
