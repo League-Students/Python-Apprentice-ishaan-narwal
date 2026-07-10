@@ -24,7 +24,7 @@ def move_tina():
 def show_anamatronics():
     global cam_num
     #tina show
-    if(cam_num == len tina_path[tina_progress]):
+    if(cam_num == len(tina_path[tina_progress]):
         tina.showturtle()
     else:
         tina.hideturtle()
