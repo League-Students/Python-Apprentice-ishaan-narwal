@@ -71,6 +71,7 @@ def exit_cam():
 def scare_tina():
     global tina_progress
     global cam_num
+    if tina_progress == len(tina_path)-1 and cam_num
 
 screen.listen()
 screen.onkey(open_cam_1, "1")
