@@ -29,24 +29,28 @@ def show_anamatronics():
 
 
 def open_cam_1():
-    
+    global cam_num
     print("CAM 1 OPEN")
     screen.bgcolor(cam_colors[0])
     show_anamatronics()
 def open_cam_2():
+    global cam_num
     print("CAM 2 OPEN")
     screen.bgcolor(cam_colors[1])
     show_anamatronics()
 def open_cam_3():
+    global cam_num
     print("CAM 2 OPEN")
     screen.bgcolor(cam_colors[2])
     show_anamatronics()
 def open_cam_4():
+    global cam_num
     print("CAM 2 OPEN")
     screen.bgcolor(cam_colors[3])
     show_anamatronics()
     
 def open_cam_5():
+    global cam_num
     print("CAM 2 OPEN")
     screen.bgcolor(cam_colors[4])
     show_anamatronics()
