@@ -71,7 +71,9 @@ def exit_cam():
 def scare_tina():
     global tina_progress
     global cam_num
-    if tina_progress == len(tina_path)-1 and cam_num == 0
+    if tina_progress == len(tina_path)-1 and cam_num == 0:
+        tina_progress = 0 
+        print ("AAAAAA")
 
 screen.listen()
 screen.onkey(open_cam_1, "1")
@@ -80,7 +82,7 @@ screen.onkey(open_cam_3, "3")
 screen.onkey(open_cam_4, "4")
 screen.onkey(open_cam_5, "5")
 screen.onkey(exit_cam, "0")
-screen.onkey(scare_tina, "0")
+screen.onkey(scare_tina, "m")
 
 
 screen.ontimer(move_tina, 2000)
