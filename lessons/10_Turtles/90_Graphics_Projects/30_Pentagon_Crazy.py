@@ -12,7 +12,8 @@ screen.setup(600, 600)
 
 cam_colors = ["red", "grey", "white", "green", "blue"]
 
-
+def move_tina():
+    tina_progress += 1
 
 def show_anamatronics(cam_num):
     #tina show
@@ -58,7 +59,7 @@ screen.onkey(open_cam_4, "4")
 screen.onkey(open_cam_5, "5")
 screen.onkey(exit_cam, "0")
 
-screen.ontimer()
+screen.ontimer(move_tina, 2000)
 
 
 
