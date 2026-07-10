@@ -3,7 +3,7 @@ import turtle
 tina = turtle.Turtle()
 
 screen = turtle.Screen()
-screen.setup(500, 500)
+screen.setup(600, 600)
 
 cam_colors = ["red", "black", "white", "green", "blue"]
 
