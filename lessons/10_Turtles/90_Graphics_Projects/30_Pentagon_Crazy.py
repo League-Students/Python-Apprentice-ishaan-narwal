@@ -42,10 +42,11 @@ def open_cam_4():
 def open_cam_5():
     print("CAM 2 OPEN")
     screen.bgcolor(cam_colors[4])
+    show_anamatronics(cam_num)
 def exit_cam():
     print("CAM EXITED")
     screen.bgcolor("yellow")
-
+    show_anamatronics(-1)
 exit_cam()
 
 screen.listen()
