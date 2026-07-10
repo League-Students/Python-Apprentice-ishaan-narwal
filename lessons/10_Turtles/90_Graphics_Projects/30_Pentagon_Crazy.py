@@ -82,7 +82,7 @@ screen.onkey(open_cam_3, "3")
 screen.onkey(open_cam_4, "4")
 screen.onkey(open_cam_5, "5")
 screen.onkey(exit_cam, "0")
-screen.onkey(scare_tina, "m")
+screen.onkey(scare_tina, "9")
 
 
 screen.ontimer(move_tina, 2000)
