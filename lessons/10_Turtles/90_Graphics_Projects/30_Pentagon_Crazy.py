@@ -18,10 +18,10 @@ def open_cam_2():
 def open_cam_3():
     print("CAM 2 OPEN")
     screen.bgcolor(cam_colors[1])
-def open_cam_2():
+def open_cam_4():
     print("CAM 2 OPEN")
     screen.bgcolor(cam_colors[1])
-def open_cam_2():
+def open_cam_5():
     print("CAM 2 OPEN")
     screen.bgcolor(cam_colors[1])
 def open_cam_2():
