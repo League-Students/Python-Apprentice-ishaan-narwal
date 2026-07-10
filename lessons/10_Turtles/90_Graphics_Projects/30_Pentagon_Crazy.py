@@ -15,7 +15,7 @@ cam_colors = ["red", "grey", "white", "green", "blue"]
 def move_tina():
     global tina_progress
     tina_progress += 1
-    if tina_progress == len(tina_path):
+    if tina_progress == len(tina_path)-1:
         print("GAME OVER")
     else: 
     shown_anamatronics()
@@ -24,7 +24,7 @@ def move_tina():
 def show_anamatronics():
     global cam_num
     #tina show
-    if(cam_num == len(tina_path[tina_progress]):
+    if(cam_num == tina_path[tina_progress]):
         tina.showturtle()
     else:
         tina.hideturtle()
@@ -69,7 +69,7 @@ def exit_cam():
     screen.bgcolor("yellow")
     show_anamatronics()
 def scare_tina():
-    globa; tina_progress
+    global tina_progress
     global cam_num
 
 screen.listen()
