@@ -59,3 +59,12 @@ screen.onkey(exit_cam, "0")
 
 
 turtle.exitonclick()
+
+
+
+
+
+
+
+
+
