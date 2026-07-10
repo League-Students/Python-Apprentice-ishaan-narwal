@@ -13,7 +13,9 @@ cam_colors = ["red", "black", "white", "green", "blue"]
 
 
 
-def show_anamatronics()
+def show_anamatronics(cam_num):
+    
+    if()
 
 
 
