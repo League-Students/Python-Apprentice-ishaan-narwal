@@ -14,8 +14,8 @@ cam_colors = ["red", "black", "white", "green", "blue"]
 
 
 def show_anamatronics(cam_num):
-    
-    if()
+    #tina show
+    if(cam_num == )
 
 
 
