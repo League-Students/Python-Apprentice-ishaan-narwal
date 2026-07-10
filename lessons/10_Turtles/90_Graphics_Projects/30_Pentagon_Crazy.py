@@ -17,7 +17,7 @@ def show_anamatronics(cam_num):
     if(cam_num == tina_path[tina_progress]):
         tina.showturtle()
     else:
-        tina.hide
+        tina.hideturtle()
 
 
 
@@ -42,7 +42,7 @@ def exit_cam():
     print("CAM EXITED")
     screen.bgcolor("yellow")
 
-
+exit_cam()
 
 screen.listen()
 screen.onkey(open_cam_1, "1")
