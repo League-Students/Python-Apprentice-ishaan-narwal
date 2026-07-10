@@ -25,24 +25,24 @@ def show_anamatronics(cam_num):
 def open_cam_1():
     print("CAM 1 OPEN")
     screen.bgcolor(cam_colors[0])
-    show_anamatronics(cam_num)
+    show_anamatronics(1)
 def open_cam_2():
     print("CAM 2 OPEN")
     screen.bgcolor(cam_colors[1])
-    show_anamatronics(cam_num)
+    show_anamatronics(2)
 def open_cam_3():
     print("CAM 2 OPEN")
     screen.bgcolor(cam_colors[2])
-    show_anamatronics(cam_num)
+    show_anamatronics(3)
 def open_cam_4():
     print("CAM 2 OPEN")
     screen.bgcolor(cam_colors[3])
-    show_anamatronics(cam_num)
+    show_anamatronics(4)
     
 def open_cam_5():
     print("CAM 2 OPEN")
     screen.bgcolor(cam_colors[4])
-    show_anamatronics(cam_num)
+    show_anamatronics(5)
 def exit_cam():
     print("CAM EXITED")
     screen.bgcolor("yellow")
