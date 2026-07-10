@@ -9,7 +9,7 @@ tina_progress = 0
 screen = turtle.Screen()
 screen.setup(600, 600)
 
-cam_colors = ["red", "black", "white", "green", "blue"]
+cam_colors = ["red", "grey", "white", "green", "blue"]
 
 
 
