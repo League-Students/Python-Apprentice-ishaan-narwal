@@ -12,12 +12,12 @@ screen.setup(600, 600)
 cam_colors = ["red", "black", "white", "green", "blue"]
 
 
-
 def show_anamatronics(cam_num):
     #tina show
     if(cam_num == tina_path[tina_progress]):
         tina.showturtle()
     else:
+        tina.hide
 
 
 
@@ -41,6 +41,7 @@ def open_cam_5():
 def exit_cam():
     print("CAM EXITED")
     screen.bgcolor("yellow")
+
 
 
 screen.listen()
